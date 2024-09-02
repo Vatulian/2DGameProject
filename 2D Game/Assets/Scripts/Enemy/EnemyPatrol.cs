@@ -25,6 +25,14 @@ public class EnemyPatrol : MonoBehaviour
     {
         initScale = enemy.localScale;
     }
+
+    private void OnEnable()
+    {
+        // Patrol tekrar etkinleþtirildiðinde, animasyonun doðru þekilde baþlamasýný saðla
+        anim.SetBool("Moving", true);
+        idleTimer = 0; // Idle süresini sýfýrla
+    }
+
     private void OnDisable()
     {
         anim.SetBool("Moving", false);
@@ -32,6 +40,8 @@ public class EnemyPatrol : MonoBehaviour
 
     private void Update()
     {
+        if (!enabled) return; // Eðer devriye modunda deðilse Update'i durdur
+
         if (movingLeft)
         {
             if (enemy.position.x >= leftEdge.position.x)
@@ -54,7 +64,10 @@ public class EnemyPatrol : MonoBehaviour
         idleTimer += Time.deltaTime;
 
         if (idleTimer > idleDuration)
+        {
             movingLeft = !movingLeft;
+            anim.SetBool("Moving", true); // Hareket animasyonunu tekrar baþlat
+        }
     }
 
     private void MoveInDirection(int _direction)
@@ -62,11 +75,11 @@ public class EnemyPatrol : MonoBehaviour
         idleTimer = 0;
         anim.SetBool("Moving", true);
 
-        //Make enemy face direction
+        // Make enemy face direction
         enemy.localScale = new Vector3(Mathf.Abs(initScale.x) * _direction,
             initScale.y, initScale.z);
 
-        //Move in that direction
+        // Move in that direction
         enemy.position = new Vector3(enemy.position.x + Time.deltaTime * _direction * speed,
             enemy.position.y, enemy.position.z);
     }
