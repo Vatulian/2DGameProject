@@ -17,6 +17,9 @@ public class MeleeEnemy : MonoBehaviour
     [SerializeField] private BoxCollider2D boxCollider;
 
     [Header("Player Layer")]
+    [SerializeField] private AudioClip attackSound;
+
+    [Header("Attack Sound")]
     [SerializeField] private LayerMask playerLayer;
     private float cooldownTimer = Mathf.Infinity;
 
@@ -34,7 +37,7 @@ public class MeleeEnemy : MonoBehaviour
     {
         anim = GetComponent<Animator>();
         enemyPatrol = GetComponentInParent<EnemyPatrol>();
-        player = GameObject.FindGameObjectWithTag("Player").transform;
+        player = GameObject.FindGameObjectWithTag("Player").transform; //todo: deðiþtir (object.find -> zenejct)
     }
 
     private void Update()
@@ -123,6 +126,7 @@ public class MeleeEnemy : MonoBehaviour
         isAttacking = true;
         anim.SetTrigger("meleeAttackTrigger");
         anim.SetBool("meleeAttackBool", true);// Saldýrý tetikleyicisini ayarla
+        SoundManager.instance.PlaySound(attackSound);
     }
 
 
@@ -144,7 +148,7 @@ public class MeleeEnemy : MonoBehaviour
 
         if (hit.collider != null)
         {
-            playerHealth = hit.transform.GetComponent<Health>();
+            playerHealth = hit.transform.GetComponent<Health>(); //todo: tryget component
         }
 
         return hit.collider != null;
@@ -152,10 +156,10 @@ public class MeleeEnemy : MonoBehaviour
 
     private void OnDrawGizmos()
     {
-        Debug.Log("Center");
-        Debug.Log(transform.right * (attackRange / 4f) * transform.localScale.x);
-        Debug.Log("Size");
-        Debug.Log(boxCollider.bounds.size.x * attackRange);
+        //Debug.Log("Center");
+        //Debug.Log(transform.right * (attackRange / 4f) * transform.localScale.x);
+        //Debug.Log("Size");
+        //Debug.Log(boxCollider.bounds.size.x * attackRange);
         Gizmos.color = Color.yellow; // Kovalama mesafesi
         Gizmos.DrawWireCube(boxCollider.bounds.center + transform.right * transform.localScale.x * colliderDistance,
             new Vector3(boxCollider.bounds.size.x * chaseRange, boxCollider.bounds.size.y, boxCollider.bounds.size.z));
@@ -167,7 +171,7 @@ public class MeleeEnemy : MonoBehaviour
 
     public void DamagePlayer()
     {
-        if (playerHealth != null && isAttacking)
+        if (playerHealth != null && isAttacking) //todo. idamagable interface
         {
             playerHealth.TakeDamage(damage);
         }

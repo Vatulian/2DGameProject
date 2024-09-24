@@ -16,6 +16,9 @@ public class Spikehead : EnemyDamage
     private bool attacking;
     private bool returning;
 
+    [Header("SFX")]
+    [SerializeField] private AudioClip spikeheadSound;
+
     private void OnEnable()
     {
         Stop();
@@ -81,10 +84,13 @@ public class Spikehead : EnemyDamage
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
+
         base.OnTriggerEnter2D(collision);
         Stop(); // Spikehead will stop when collide something
         returning = true; // Retrun after collide
         StartCoroutine(SmoothLerp(returnSpeed)); // Start coroutine
+        SoundManager.instance.PlaySound(spikeheadSound);
+
     }
 
     private IEnumerator SmoothLerp(float time)
