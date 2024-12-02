@@ -14,6 +14,7 @@ public class LandMovement : MonoBehaviour
     private float rightEdge;
     private float bottomEdge;
     private float topEdge;
+    public Vector3 PlatformSpeed {get; set;}
 
     private void Awake()
     {
@@ -24,20 +25,27 @@ public class LandMovement : MonoBehaviour
         topEdge = transform.position.y + verticalDistance;
     }
 
-    private void Update()
+    private void FixedUpdate()
     {
         
         if (movingLeft)
         {
             if (transform.position.x > leftEdge)
-                transform.position += Vector3.left * speed * Time.deltaTime;
+            {
+                PlatformSpeed = Vector3.left * speed;
+                transform.position += PlatformSpeed;
+            }
             else
                 movingLeft = false;
         }
         else
         {
             if (transform.position.x < rightEdge)
-                transform.position += Vector3.right * speed * Time.deltaTime;
+            {
+                PlatformSpeed = Vector3.right * speed;
+                transform.position += PlatformSpeed;
+            }
+                
             else
                 movingLeft = true;
         }

@@ -10568,7 +10568,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   horizontalDistance: 3
   verticalDistance: 0
-  speed: 5
+  speed: 0.1
 --- !u!61 &1191322620
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -10641,6 +10641,18 @@ Rigidbody2D:
   m_SleepingMode: 1
   m_CollisionDetection: 0
   m_Constraints: 0
+--- !u!114 &1191322624
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1191322617}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b9e89b0dc55f61241b522782e64bb697, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &1195309950
 GameObject:
   m_ObjectHideFlags: 0
@@ -15788,7 +15800,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7797812053017012829, guid: 09095a2398b1c9a4da4079cddffcae12, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -41.01
+      value: -48.06
       objectReference: {fileID: 0}
     - target: {fileID: 7797812053017012829, guid: 09095a2398b1c9a4da4079cddffcae12, type: 3}
       propertyPath: m_LocalPosition.z
@@ -15847,6 +15859,9 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 8045280115656241165, guid: 09095a2398b1c9a4da4079cddffcae12, type: 3}
       insertIndex: -1
       addedObject: {fileID: 1191322622}
+    - targetCorrespondingSourceObject: {fileID: 8045280115656241165, guid: 09095a2398b1c9a4da4079cddffcae12, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1191322624}
   m_SourcePrefab: {fileID: 100100000, guid: 09095a2398b1c9a4da4079cddffcae12, type: 3}
 --- !u!1 &1888010521
 GameObject:
