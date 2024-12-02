@@ -202,6 +202,7 @@ public class PlayerMovement : MonoBehaviour
                 _lastWallJumpDir = (LastOnWallRightTime > 0) ? -1 : 1;
 
                 WallJump(_lastWallJumpDir);
+
             }
         }
         #endregion

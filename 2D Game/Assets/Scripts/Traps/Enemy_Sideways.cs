@@ -2,38 +2,62 @@ using UnityEngine;
 
 public class Enemy_Sideways : MonoBehaviour
 {
-    [SerializeField] private float movementDistance;
-    [SerializeField] private float speed;
+    [Header("Movement Settings")]
+    [SerializeField] private float horizontalDistance; // Yatay hareket mesafesi
+    [SerializeField] private float verticalDistance;   // Dikey hareket mesafesi
+    [SerializeField] private float speed;             // Hareket hýzý
+
+    [Header("Damage Settings")]
     [SerializeField] private float damage;
+
     private bool movingLeft;
+    private bool movingUp;
     private float leftEdge;
     private float rightEdge;
+    private float bottomEdge;
+    private float topEdge;
 
     private void Awake()
     {
-        leftEdge = transform.position.x - movementDistance;
-        rightEdge = transform.position.x + movementDistance;
+        // Yatay ve dikey sýnýrlarý ayarla
+        leftEdge = transform.position.x - horizontalDistance;
+        rightEdge = transform.position.x + horizontalDistance;
+        bottomEdge = transform.position.y - verticalDistance;
+        topEdge = transform.position.y + verticalDistance;
     }
 
     private void Update()
     {
+        // X ekseninde hareket
         if (movingLeft)
         {
             if (transform.position.x > leftEdge)
-            {
-                transform.position = new Vector3(transform.position.x - speed * Time.deltaTime, transform.position.y, transform.position.z);
-            }
+                transform.position += Vector3.left * speed * Time.deltaTime;
             else
                 movingLeft = false;
         }
         else
         {
             if (transform.position.x < rightEdge)
-            {
-                transform.position = new Vector3(transform.position.x + speed * Time.deltaTime, transform.position.y, transform.position.z);
-            }
+                transform.position += Vector3.right * speed * Time.deltaTime;
             else
                 movingLeft = true;
+        }
+
+        // Y ekseninde hareket
+        if (movingUp)
+        {
+            if (transform.position.y < topEdge)
+                transform.position += Vector3.up * speed * Time.deltaTime;
+            else
+                movingUp = false;
+        }
+        else
+        {
+            if (transform.position.y > bottomEdge)
+                transform.position += Vector3.down * speed * Time.deltaTime;
+            else
+                movingUp = true;
         }
     }
 
@@ -41,7 +65,7 @@ public class Enemy_Sideways : MonoBehaviour
     {
         if (collision.tag == "Player")
         {
-            collision.GetComponent<Health>().TakeDamage(damage);
+            collision.GetComponent<Health>()?.TakeDamage(damage);
         }
     }
 }
