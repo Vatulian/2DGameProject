@@ -87,7 +87,7 @@ public class Spikehead : EnemyDamage
 
         base.OnTriggerEnter2D(collision);
         Stop(); // Spikehead will stop when collide something
-        returning = true; // Retrun after collide
+        returning = true; // Return after collide
         StartCoroutine(SmoothLerp(returnSpeed)); // Start coroutine
         SoundManager.instance.PlaySound(spikeheadSound);
 

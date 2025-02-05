@@ -19,7 +19,7 @@ public class Enemy_Sideways : MonoBehaviour
 
     private void Awake()
     {
-        // Yatay ve dikey sýnýrlarý ayarla
+        // Horizontal and Vercital Edge limit
         leftEdge = transform.position.x - horizontalDistance;
         rightEdge = transform.position.x + horizontalDistance;
         bottomEdge = transform.position.y - verticalDistance;
@@ -28,7 +28,7 @@ public class Enemy_Sideways : MonoBehaviour
 
     private void Update()
     {
-        // X ekseninde hareket
+        // X-axis movement
         if (movingLeft)
         {
             if (transform.position.x > leftEdge)
@@ -44,7 +44,7 @@ public class Enemy_Sideways : MonoBehaviour
                 movingLeft = true;
         }
 
-        // Y ekseninde hareket
+        // Y-axis movement
         if (movingUp)
         {
             if (transform.position.y < topEdge)

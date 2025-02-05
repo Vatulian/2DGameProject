@@ -37,7 +37,7 @@ public class MeleeEnemy : MonoBehaviour
     {
         anim = GetComponent<Animator>();
         enemyPatrol = GetComponentInParent<EnemyPatrol>();
-        player = GameObject.FindGameObjectWithTag("Player").transform; //todo: deðiþtir (object.find -> zenejct)
+        player = GameObject.FindGameObjectWithTag("Player").transform; 
     }
 
     private void Update()
@@ -148,7 +148,7 @@ public class MeleeEnemy : MonoBehaviour
 
         if (hit.collider != null)
         {
-            playerHealth = hit.transform.GetComponent<Health>(); //todo: tryget component
+            playerHealth = hit.transform.GetComponent<Health>();
         }
 
         return hit.collider != null;
@@ -171,19 +171,19 @@ public class MeleeEnemy : MonoBehaviour
 
     public void DamagePlayer()
     {
-        if (playerHealth != null && isAttacking) //todo. idamagable interface
+        if (playerHealth != null && isAttacking) //can make idamagable interface
         {
             playerHealth.TakeDamage(damage);
         }
-        isAttacking = false; // Saldýrý sonrasý normal moda dön
+        isAttacking = false; // after attacking, turn back to normal mode
 
         if (isChasing)
         {
-            anim.SetBool("Moving", true); // Eðer kovalama modundaysa tekrar koþma animasyonuna geç
+            anim.SetBool("Moving", true); // if chasing mode is active, execute moving animation
         }
         else
         {
-            anim.SetBool("Idle", true); // Saldýrý sonrasý idle animasyonuna geç
+            anim.SetBool("Idle", true); // after attacking, stance "idle"
         }
     }
 }

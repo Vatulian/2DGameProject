@@ -37,7 +37,7 @@ public class PlayerData : ScriptableObject
     [HideInInspector] public float jumpForce; //The actual force applied (upwards) to the player when they jump.
 
     [Header("Both Jumps")]
-    public float jumpCutGravityMult; //Multiplier to increase gravity if the player releases thje jump button while still jumping
+    public float jumpCutGravityMult; //Multiplier to increase gravity if the player releases the jump button while still jumping
     [Range(0f, 1)] public float jumpHangGravityMult; //Reduces gravity while close to the apex (desired max height) of the jump
     public float jumpHangTimeThreshold; //Speeds (close to 0) where the player will experience extra "jump hang". The player's velocity.y is closest to 0 at the jump's apex (think of the gradient of a parabola or quadratic function)
     [Space(0.5f)]
@@ -71,7 +71,7 @@ public class PlayerData : ScriptableObject
     public float dashAttackTime;
     [Space(5)]
     public float dashEndTime; //Time after you finish the inital drag phase, smoothing the transition back to idle (or any standard state)
-    public Vector2 dashEndSpeed; //Slows down player, makes dash feel more responsive (used in Celeste)
+    public Vector2 dashEndSpeed; //Slows down player, makes dash feel more responsive
     [Range(0f, 1f)] public float dashEndRunLerp; //Slows the affect of player movement while dashing
     [Space(5)]
     public float dashRefillTime;

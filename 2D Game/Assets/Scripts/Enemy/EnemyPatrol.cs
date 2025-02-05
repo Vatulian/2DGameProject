@@ -40,7 +40,7 @@ public class EnemyPatrol : MonoBehaviour
 
     private void Update()
     {
-        if (!enabled) return; // Eðer devriye modunda deðilse Update'i durdur
+        if (!enabled) return; // If It is not patrolling, stop update.
 
         if (movingLeft)
         {
@@ -66,7 +66,7 @@ public class EnemyPatrol : MonoBehaviour
         if (idleTimer > idleDuration)
         {
             movingLeft = !movingLeft;
-            anim.SetBool("Moving", true); // Hareket animasyonunu tekrar baþlat
+            anim.SetBool("Moving", true); // Start the movement animation
         }
     }
 
