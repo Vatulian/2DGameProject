@@ -2,26 +2,46 @@ using UnityEngine;
 
 public class Projectile : MonoBehaviour
 {
+    [Header("Motion")]
     [SerializeField] private float speed = 10f;
-    private float direction;
+
+    [Header("Collision (layer-based)")]
+    [SerializeField] private LayerMask damageLayers;      // Enemy, Boss vb.
+    [SerializeField] private LayerMask passThroughLayers; // Player, PlayerTriggers vb.
+    [SerializeField] private float minLifetimeBeforeHit = 0.05f; // spawn sonrası kısa bağışıklık
+
+    private float direction = 1f;
     private bool hit;
     private float lifetime;
+    private float spawnTime;
 
     private Animator anim;
-    private BoxCollider2D boxCollider;
+    private Collider2D myCollider;
+
+    // Sahip (self-hit engellemek için)
+    private Transform owner;
+    private Collider2D[] ownerColliders;
 
     private void Awake()
     {
         anim = GetComponent<Animator>();
-        boxCollider = GetComponent<BoxCollider2D>();
+        myCollider = GetComponent<Collider2D>();
+    }
+
+    private void OnEnable()
+    {
+        hit = false;
+        lifetime = 0f;
+        spawnTime = Time.time;
+        if (myCollider) myCollider.enabled = true;
     }
 
     private void Update()
     {
         if (hit) return;
 
-        float movementSpeed = speed * Time.deltaTime * direction;
-        transform.Translate(movementSpeed, 0f, 0f);
+        float movement = speed * Time.deltaTime * direction;
+        transform.Translate(movement, 0f, 0f);
 
         lifetime += Time.deltaTime;
         if (lifetime > 5f)
@@ -31,50 +51,95 @@ public class Projectile : MonoBehaviour
     private void OnTriggerEnter2D(Collider2D collision)
     {
         if (hit) return;
-        hit = true;
 
-        if (boxCollider) boxCollider.enabled = false;
+        // Spawn anındaki çakışmaları yok say
+        if (Time.time - spawnTime < minLifetimeBeforeHit) return;
+
+        // Sahibime/çocuklarına asla vurma
+        if (owner && (collision.transform == owner || collision.transform.IsChildOf(owner))) return;
+
+        int colMask = 1 << collision.gameObject.layer;
+
+        // Pass-through layer'ları tamamen yok say (Player, PlayerTriggers vb.)
+        if ((passThroughLayers.value & colMask) != 0) return;
+
+        // Patlama animini tetikle
+        hit = true;
+        if (myCollider) myCollider.enabled = false;
         if (anim) anim.SetTrigger("Explode");
 
-        // 1) Önce Health ara (düşmanlar)
-        Health hp = collision.GetComponent<Health>() ?? collision.GetComponentInParent<Health>();
-        if (hp != null)
+        // Çarpışma noktası (VFX için iyi görünür)
+        Vector3 hitPoint = collision.bounds.ClosestPoint(transform.position);
+
+        // Sadece damageLayers içindeyse hasar uygula
+        bool canDamage = (damageLayers.value & colMask) != 0;
+        if (canDamage)
         {
-            hp.TakeDamage(1);
-            Debug.Log($"Projectile hit an Enemy with Health: {hp.name}");
-            return;
+            // Önce Health (normal düşmanlar)
+            var hp = collision.GetComponent<Health>() ?? collision.GetComponentInParent<Health>();
+            if (hp != null)
+            {
+                hp.TakeDamage(1);
+                return;
+            }
+
+            // Sonra Boss (vuruş noktasıyla)
+            var boss = collision.GetComponent<Boss>() ?? collision.GetComponentInParent<Boss>();
+            if (boss != null)
+            {
+                boss.TakeDamageAt(1, hitPoint);
+                return;
+            }
         }
 
-        // 2) Boss kontrolü
-        Boss boss = collision.GetComponent<Boss>() ?? collision.GetComponentInParent<Boss>();
-        if (boss != null)
-        {
-            boss.TakeDamage(1);
-            Debug.Log($"Projectile hit the Boss! Remaining HP: {boss.health}");
-            return;
-        }
-
-        // 3) Ne Health ne Boss bulunamadıysa
-        Debug.Log($"Projectile hit something else: {collision.name} (tag: {collision.tag})");
-        // Deactivate(); // anim event yoksa aç
+        // Hasar yoksa sadece patlar (anim event yoksa alttakini aç)
+        // Deactivate();
     }
 
-    public void SetDirection(float _direction)
+    /// <summary>
+    /// Sahibi ve yönüyle ateşle (önerilen).
+    /// </summary>
+    public void Fire(Transform shooter, float dir)
     {
-        lifetime = 0f;
-        direction = _direction;
+        owner = shooter;
+        ownerColliders = shooter ? shooter.GetComponentsInChildren<Collider2D>() : null;
+
+        // Sahibimle çarpışmayı kapat
+        if (myCollider && ownerColliders != null)
+        {
+            foreach (var oc in ownerColliders)
+                if (oc) Physics2D.IgnoreCollision(myCollider, oc, true);
+        }
+
+        direction = Mathf.Sign(dir) == 0 ? 1f : Mathf.Sign(dir);
         gameObject.SetActive(true);
         hit = false;
-        if (boxCollider) boxCollider.enabled = true;
+        lifetime = 0f;
+        spawnTime = Time.time;
+        if (myCollider) myCollider.enabled = true;
 
-        Vector3 scale = transform.localScale;
-        if (Mathf.Sign(scale.x) != _direction)
-            scale.x = -scale.x;
-        transform.localScale = scale;
+        // Görsel flip
+        var s = transform.localScale;
+        if (Mathf.Sign(s.x) != direction) s.x = -s.x;
+        transform.localScale = s;
     }
+
+    /// <summary>
+    /// Geriye uyumluluk; sahibi göndermez (self-hit koruması zayıflar).
+    /// </summary>
+    public void SetDirection(float dir) => Fire(null, dir);
 
     private void Deactivate()
     {
+        // Sahibimle ignore'u geri aç
+        if (myCollider && ownerColliders != null)
+        {
+            foreach (var oc in ownerColliders)
+                if (oc) Physics2D.IgnoreCollision(myCollider, oc, false);
+        }
+
         gameObject.SetActive(false);
+        owner = null;
+        ownerColliders = null;
     }
 }

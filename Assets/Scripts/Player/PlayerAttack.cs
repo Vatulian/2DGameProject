@@ -2,15 +2,14 @@ using UnityEngine;
 
 public class PlayerAttack : MonoBehaviour
 {
-    [SerializeField] private float attackCooldown = 1f;  // Default cooldown time
+    [SerializeField] private float attackCooldown = 0.25f;
     [SerializeField] private Transform firePoint;
-    [SerializeField] private GameObject[] fireballs;
+    [SerializeField] private GameObject[] fireballs;   // object pool
     [SerializeField] private AudioClip fireballSound;
 
     private Animator anim;
     private PlayerMovement playerMovement;
-    private float cooldownTimer = Mathf.Infinity;
-    private bool isAttacking;
+    private float cooldownTimer = 0f;
 
     private void Awake()
     {
@@ -20,45 +19,48 @@ public class PlayerAttack : MonoBehaviour
 
     private void Update()
     {
-        cooldownTimer += Time.deltaTime;
+        cooldownTimer -= Time.deltaTime;
 
-        if (Input.GetMouseButton(0) && cooldownTimer >= attackCooldown && playerMovement.canAttack())
+        // Tek tıklama ile ateş (basılı tutup otomatik ateş istersen altta opsiyon var)
+        if (Input.GetMouseButtonDown(0) && cooldownTimer <= 0f && playerMovement != null && playerMovement.canAttack())
         {
-            if (!isAttacking) // Ensure that Attack is not called multiple times
-            {
-                isAttacking = true;
-                Attack();
-            }
+            FireOnce();
         }
-        else
+
+        /*  // *** OPSİYONEL: basılı tutarak auto-fire ***
+        if (Input.GetMouseButton(0) && cooldownTimer <= 0f && playerMovement != null && playerMovement.canAttack())
         {
-            isAttacking = false;
+            FireOnce();
         }
+        */
     }
 
-    private void Attack()
+    private void FireOnce()
     {
-        SoundManager.instance.PlaySound(fireballSound);
-        anim.SetTrigger("Attack");
-        cooldownTimer = 0f;
+        int idx = FindInactiveFireball();
+        if (idx < 0) return;
 
-        int fireballIndex = FindFireball();
+        cooldownTimer = attackCooldown;
 
-        if (fireballIndex >= 0)
-        {
-            GameObject fireball = fireballs[fireballIndex];
-            fireball.transform.position = firePoint.position;
-            fireball.GetComponent<Projectile>().SetDirection(Mathf.Sign(transform.localScale.x));
-        }
+        if (anim) anim.SetTrigger("Attack");
+        if (SoundManager.instance && fireballSound) SoundManager.instance.PlaySound(fireballSound);
+
+        GameObject go = fireballs[idx];
+        go.transform.position = firePoint.position;
+
+        float dir = Mathf.Sign(transform.localScale.x);
+        var proj = go.GetComponent<Projectile>();
+        if (proj != null)
+            proj.Fire(transform, dir);      // owner gönder → self-hit yok, spawn patlaması yok
+        else
+            go.GetComponent<Projectile>()?.SetDirection(dir); // geriye uyumluluk, gerekmezse silebilirsin
     }
 
-    private int FindFireball()
+    private int FindInactiveFireball()
     {
         for (int i = 0; i < fireballs.Length; i++)
-        {
             if (!fireballs[i].activeInHierarchy)
                 return i;
-        }
-        return -1; // Return -1 if no available fireball is found
+        return -1;
     }
 }

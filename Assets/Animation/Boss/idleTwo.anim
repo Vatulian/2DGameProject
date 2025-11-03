@@ -331,7 +331,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 8.59
+        value: 9.31
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -361,7 +361,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 8.1
+        value: 8.91
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -389,7 +389,7 @@ AnimationClip:
   - serializedVersion: 2
     curve:
     - time: 0
-      value: {fileID: 0}
+      value: {fileID: 1751483653, guid: b9273ec7ccdde0f498fb50534b995807, type: 3}
     - time: 0.033333335
       value: {fileID: 1751483653, guid: b9273ec7ccdde0f498fb50534b995807, type: 3}
     attribute: m_Sprite
@@ -504,7 +504,7 @@ AnimationClip:
       isIntCurve: 0
       isSerializeReferenceCurve: 0
     pptrCurveMapping:
-    - {fileID: 0}
+    - {fileID: 1751483653, guid: b9273ec7ccdde0f498fb50534b995807, type: 3}
     - {fileID: 1751483653, guid: b9273ec7ccdde0f498fb50534b995807, type: 3}
   m_AnimationClipSettings:
     serializedVersion: 2
@@ -1577,7 +1577,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 8.59
+        value: 9.31
         inSlope: 0
         outSlope: 0
         tangentMode: 136
@@ -1607,7 +1607,7 @@ AnimationClip:
       m_Curve:
       - serializedVersion: 3
         time: 0
-        value: 8.1
+        value: 8.91
         inSlope: 0
         outSlope: 0
         tangentMode: 136

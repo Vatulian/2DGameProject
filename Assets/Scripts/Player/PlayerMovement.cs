@@ -590,8 +590,9 @@ public class PlayerMovement : MonoBehaviour
     #endregion
     public bool canAttack()
     {
-        return !IsJumping && _moveInput.x == 0;
+        return !IsDashing && !IsWallJumping && !IsSliding;
     }
+
 
 }
 
