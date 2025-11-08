@@ -97,6 +97,8 @@ GameObject:
   - component: {fileID: 5263459744842124595}
   - component: {fileID: 1544068250546429912}
   - component: {fileID: 855491858925112973}
+  - component: {fileID: 5387877276287094909}
+  - component: {fileID: 2806820729466646917}
   m_Layer: 11
   m_Name: Boss
   m_TagString: Enemy
@@ -222,6 +224,46 @@ CircleCollider2D:
   m_Offset: {x: 0.26, y: 0.59}
   serializedVersion: 2
   m_Radius: 2.98
+--- !u!114 &5387877276287094909
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3819040163734816915}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 36d54243f13d854459309b77bd122861, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  flashColor: {r: 1, g: 1, b: 1, a: 1}
+  flashDuration: 0.08
+  intensity: 3
+  useUnscaledTime: 0
+  hitSfx: {fileID: 8300000, guid: 69ccb40b84c285c4ba9f3c2695435638, type: 3}
+  logDebug: 1
+--- !u!114 &2806820729466646917
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3819040163734816915}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1041b1f30c5960c49b784818c4e0e8ac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  hitSparkPrefab: {fileID: 674401010519254451, guid: 9299a6ecf8ad7fe49a2a36908b960462, type: 3}
+  sparkScale: 2
+  shockwavePrefab: {fileID: 0}
+  shockwaveFactor: 0.6
+  shockwaveLifetime: 0.12
+  placeShockwaveAtHit: 0
+  targetCamera: {fileID: 0}
+  shakeDuration: 0.08
+  shakeMagnitude: 0.15
+  hitSfxHeavy: {fileID: 0}
 --- !u!1 &4007921858125765509
 GameObject:
   m_ObjectHideFlags: 0
