@@ -22,7 +22,7 @@ TagManager:
   - Enemy
   - PlayerProjectile
   - Trigger
-  - 
+  - Decor
   - 
   - 
   - 
@@ -55,4 +55,7 @@ TagManager:
     locked: 0
   - name: Ground
     uniqueID: 2595820849
+    locked: 0
+  - name: Decor
+    uniqueID: 3899817389
     locked: 0

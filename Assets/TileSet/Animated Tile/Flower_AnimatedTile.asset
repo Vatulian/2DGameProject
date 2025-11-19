@@ -1,0 +1,27 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13b75c95f34a00d4e8c04f76b73312e6, type: 3}
+  m_Name: Flower_AnimatedTile
+  m_EditorClassIdentifier: 
+  m_AnimatedSprites:
+  - {fileID: 7124961403815357476, guid: c03f371c11bded142aa9945e334e623e, type: 3}
+  - {fileID: -2364221744803657551, guid: c03f371c11bded142aa9945e334e623e, type: 3}
+  - {fileID: -5194402961688304894, guid: c03f371c11bded142aa9945e334e623e, type: 3}
+  - {fileID: 7608361196867862709, guid: c03f371c11bded142aa9945e334e623e, type: 3}
+  - {fileID: -4833322291742062242, guid: c03f371c11bded142aa9945e334e623e, type: 3}
+  - {fileID: -2550817173201295584, guid: c03f371c11bded142aa9945e334e623e, type: 3}
+  m_MinSpeed: 1
+  m_MaxSpeed: 1
+  m_AnimationStartTime: 0
+  m_AnimationStartFrame: 0
+  m_TileColliderType: 0
+  m_TileAnimationFlags: 0
