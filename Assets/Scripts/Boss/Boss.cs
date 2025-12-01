@@ -15,11 +15,17 @@ public class Boss : MonoBehaviour
 
     [Header("Components")]
     private Animator anim;
-    private HitFlash hitFlash;          // beyaz flick
-    private BossHitVFX hitVfx;          // patlama/shake (opsiyonel)
+    private HitFlash hitFlash;
+    private BossHitVFX hitVfx;
 
     public bool isDead;
     private bool stageTwoTriggered;
+
+    [Header("Door On Death")]
+    [SerializeField] private DoorController doorOnDeath;
+    
+    [Header("Arena Walls")]
+    [SerializeField] private GameObject arenaWalls;
 
     private void Start()
     {
@@ -53,9 +59,7 @@ public class Boss : MonoBehaviour
         }
 
         if (health <= 0)
-        {
             Die();
-        }
     }
 
     private void OnTriggerEnter2D(Collider2D other)
@@ -72,14 +76,12 @@ public class Boss : MonoBehaviour
         }
     }
 
-    // Konumsuz hasar (gereken yerlerde kolay çağrılsın diye)
     public void TakeDamage(int amount)
     {
         TakeDamageAt(amount, transform.position);
     }
 
-    // Vuruş noktasıyla hasar (Projectile burayı çağırır)
-    public void TakeDamageAt(int amount, Vector3 hitWorldPos)
+    public void TakeDamageAt(int amount, Vector3 hitPos)
     {
         if (isDead) return;
 
@@ -88,9 +90,8 @@ public class Boss : MonoBehaviour
         if (healthBar != null)
             healthBar.value = health;
 
-        // Görsel/ses geri bildirimleri
-        hitFlash?.Play();               // beyaz flick
-        hitVfx?.PlayAt(hitWorldPos);    // patlama + shake + sfx (varsa)
+        hitFlash?.Play();
+        hitVfx?.PlayAt(hitPos);
 
         if (!stageTwoTriggered && health <= 10)
         {
@@ -99,9 +100,7 @@ public class Boss : MonoBehaviour
         }
 
         if (health <= 0)
-        {
             Die();
-        }
     }
 
     private void Die()
@@ -109,14 +108,23 @@ public class Boss : MonoBehaviour
         if (isDead) return;
         isDead = true;
 
-        // Son beyaz yanıp sönme efekti (opsiyonel)
-        GetComponent<HitFlash>()?.Play();
-
         anim.SetTrigger("death");
 
-        // Can barını gizle
         if (healthBar != null)
             healthBar.gameObject.SetActive(false);
-    }
+        
+        if (arenaWalls != null)
+            arenaWalls.SetActive(false);
 
+        // OPEN DOOR AFTER BOSS DEATH
+        if (doorOnDeath != null)
+            doorOnDeath.OpenDoor();
+
+        // CAMERA UNLOCK + ZOOM RESET
+        CameraController cam = FindObjectOfType<CameraController>();
+        if (cam != null)
+        {
+            cam.Unlock();
+        }
+    }
 }

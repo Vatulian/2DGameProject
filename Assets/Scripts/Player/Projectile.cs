@@ -91,9 +91,7 @@ public class Projectile : MonoBehaviour
                 return;
             }
         }
-
-        // Hasar yoksa sadece patlar (anim event yoksa alttakini aç)
-        // Deactivate();
+        
     }
 
     /// <summary>
