@@ -24,10 +24,13 @@ public class Health : MonoBehaviour
     [SerializeField] private AudioClip deathSound;
     [SerializeField] private AudioClip hurtSound;
 
+    
+    public bool IsInvulnerable => invulnerable;
+
     private void Awake()
     {
         currentHealth = startingHealth;
-        checkpointHealth = currentHealth; 
+        checkpointHealth = currentHealth;
         anim = GetComponent<Animator>();
         spriteRend = GetComponent<SpriteRenderer>();
     }
@@ -39,23 +42,28 @@ public class Health : MonoBehaviour
 
         if (currentHealth > 0)
         {
-            anim.SetTrigger("Hurt");
+            if (anim != null) anim.SetTrigger("Hurt");
             StartCoroutine(Invunerability());
-            SoundManager.instance.PlaySound(hurtSound);
+            if (hurtSound != null)
+                SoundManager.instance.PlaySound(hurtSound);
         }
         else
         {
             if (!dead)
             {
-                //Deactivate all attached component classes
                 foreach (Behaviour component in components)
-                    component.enabled = false;
+                    if (component != null)
+                        component.enabled = false;
 
-                anim.SetBool("Grounded", true);
-                anim.SetTrigger("Die");
+                if (anim != null)
+                {
+                    anim.SetBool("Grounded", true);
+                    anim.SetTrigger("Die");
+                }
 
                 dead = true;
-                SoundManager.instance.PlaySound(deathSound);
+                if (deathSound != null)
+                    SoundManager.instance.PlaySound(deathSound);
             }
         }
     }
@@ -80,7 +88,7 @@ public class Health : MonoBehaviour
         invulnerable = false;
     }
 
-    private void Deactivate()
+    public void Deactivate()
     {
         gameObject.SetActive(false);
     }
@@ -94,12 +102,17 @@ public class Health : MonoBehaviour
     {
         dead = false;
         currentHealth = checkpointHealth;
-        anim.ResetTrigger("Die");
-        anim.Play("Idle");
+        if (anim != null)
+        {
+            anim.ResetTrigger("Die");
+            anim.Play("Idle");
+        }
         StartCoroutine(Invunerability());
 
-        //Activate all attached component classes
         foreach (Behaviour component in components)
-            component.enabled = true;
+            if (component != null)
+                component.enabled = true;
     }
+    public bool Invulnerable => invulnerable;
+
 }
