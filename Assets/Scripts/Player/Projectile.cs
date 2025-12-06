@@ -80,6 +80,12 @@ public class Projectile : MonoBehaviour
             if (hp != null)
             {
                 hp.TakeDamage(1);
+
+                // ---- HİT FLASH BURADA ----
+                var flash = hp.GetComponentInChildren<HitFlash>();
+                if (flash != null)
+                    flash.Play();
+
                 return;
             }
 
@@ -91,7 +97,6 @@ public class Projectile : MonoBehaviour
                 return;
             }
         }
-        
     }
 
     /// <summary>
