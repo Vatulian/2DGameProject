@@ -240,7 +240,7 @@ MonoBehaviour:
   gameOverScreen: {fileID: 0}
   pauseScreen: {fileID: 0}
   gameOverSound: {fileID: 0}
-  firstLevelName: Level1
+  firstLevelName: Level2
   enablePauseInThisScene: 1
   playerRespawn: {fileID: 0}
 --- !u!224 &375602251 stripped

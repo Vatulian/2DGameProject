@@ -119,6 +119,16 @@ public class Boss : MonoBehaviour
         // OPEN DOOR AFTER BOSS DEATH
         if (doorOnDeath != null)
             doorOnDeath.OpenDoor();
+        
+        // ACTIVATE END PORTAL AFTER BOSS DEATH
+        if (LevelFlow.Instance != null)
+        {
+            LevelFlow.Instance.ActivateEndPortal();
+        }
+        else
+        {
+            Debug.LogError("[Boss] LevelFlow.Instance is NULL! LevelFlow object missing in scene?");
+        }
 
         // CAMERA UNLOCK + ZOOM RESET
         CameraController cam = FindObjectOfType<CameraController>();

@@ -11,7 +11,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] private AudioClip gameOverSound;
 
     [Header("Level Loading")]
-    [SerializeField] private string firstLevelName = "Level1"; // PlayGame() burayı yükler
+    [SerializeField] private string firstLevelName = "Level2"; // PlayGame() burayı yükler
 
     [Header("Pause Settings")]
     [SerializeField] private bool enablePauseInThisScene = true; // MainMenu'de false yapabilirsin

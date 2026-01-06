@@ -5,6 +5,11 @@ public class DoorController : MonoBehaviour
     [SerializeField] private Animator animator;
     [SerializeField] private Collider2D doorCollider;
 
+    [Header("Start State")]
+    [SerializeField] private bool startOpen = false;
+
+    private bool isOpen;
+
     private void Reset()
     {
         animator     = GetComponent<Animator>();
@@ -13,45 +18,73 @@ public class DoorController : MonoBehaviour
 
     private void Start()
     {
-        // Başlangıçta kapı açık varsayıyoruz
-        if (animator != null)
-            animator.Play("Opening", 0, 1f); // Opening klibinin son karesi
-
-        if (doorCollider != null)
-            doorCollider.enabled = false; // açıkken collider kapalı
+        ApplyStartState();
     }
 
-    // BossTriggerZone'dan çağıracağımız fonksiyon
-    public void CloseDoor()
+    private void ApplyStartState()
     {
-        if (animator == null) return;
+        isOpen = startOpen;
 
-        animator.ResetTrigger("Open");
-        animator.SetTrigger("Close");
-        // Kapanma animasyonu bitince anim event ile EnableCollider çağıracağız
+        if (animator != null)
+        {
+            if (startOpen)
+            {
+                // Kapı AÇIK başlasın
+                animator.Play("Opening", 0, 1f);
+            }
+            else
+            {
+                // Kapı KAPALI başlasın
+                animator.Play("Closing", 0, 1f);
+            }
+        }
+
+        if (doorCollider != null)
+            doorCollider.enabled = !startOpen; // kapalıysa collider açık
     }
 
     public void OpenDoor()
     {
+        if (isOpen) return;
+
+        Debug.Log("[DoorController] OpenDoor CALLED");
+
+        isOpen = true;
+
         if (animator == null) return;
 
         animator.ResetTrigger("Close");
         animator.SetTrigger("Open");
-        // Açılma bitince DisableCollider anim event'i
     }
 
-    // --- Animation Event fonksiyonları ---
+    public void CloseDoor()
+    {
+        if (!isOpen) return;
 
-    // Closing klibinin SON karesine event ekle → EnableCollider
+        Debug.Log("[DoorController] CloseDoor CALLED");
+
+        isOpen = false;
+
+        if (animator == null) return;
+
+        animator.ResetTrigger("Open");
+        animator.SetTrigger("Close");
+    }
+
+    // --- Animation Events ---
+
+    // Closing animasyonunun SON karesine koy
     public void EnableCollider()
     {
+        Debug.Log("[DoorController] EnableCollider");
         if (doorCollider != null)
             doorCollider.enabled = true;
     }
 
-    // Opening klibinin SON karesine event ekle → DisableCollider
+    // Opening animasyonunun SON karesine koy
     public void DisableCollider()
     {
+        Debug.Log("[DoorController] DisableCollider");
         if (doorCollider != null)
             doorCollider.enabled = false;
     }
