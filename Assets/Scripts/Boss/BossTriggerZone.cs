@@ -70,4 +70,36 @@ public class BossTriggerZone : MonoBehaviour
         if (!oneTimeTrigger)
             triggered = false;
     }
+    public void ResetBossFight()
+    {
+        StopAllCoroutines();
+        triggered = false;
+
+        // Boss reset + kapat
+        if (bossObject != null)
+        {
+            Boss boss = bossObject.GetComponent<Boss>();
+            if (boss != null)
+                boss.ResetBoss();
+
+            bossObject.SetActive(false);
+        }
+
+        // Boss UI kapalı
+        if (bossHealthUI != null)
+            bossHealthUI.SetActive(false);
+
+        // Arena duvarları OFF
+        if (arenaWalls != null)
+            arenaWalls.DeactivateWalls();
+
+        // Kapı tekrar AÇIK
+        if (doorToClose != null)
+            doorToClose.OpenDoor();
+
+        // Kamera normal moda dön
+        if (cameraController != null)
+            cameraController.Unlock();
+    }
+
 }

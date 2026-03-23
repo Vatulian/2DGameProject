@@ -24,15 +24,24 @@ public class PlayerRespawn : MonoBehaviour
     {
         if (currentCheckpoint != null)
         {
-            playerHealth.Respawn(); // Restore player health
-            transform.position = currentCheckpoint.position; // Move to checkpoint location
+            playerHealth.Respawn();
+            transform.position = currentCheckpoint.position;
+
+            // Boss Ã¶lmediyse boss fight state'ini resetle (kamera/duvar/kapÄ±/boss/ui)
+            Boss boss = FindObjectOfType<Boss>(true);
+            if (boss != null && !boss.isDead)
+            {
+                BossTriggerZone zone = FindObjectOfType<BossTriggerZone>(true);
+                if (zone != null) zone.ResetBossFight();
+            }
         }
         else
         {
             Debug.LogWarning("No checkpoint available! Restarting from the beginning.");
-            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex); // Restart level
+            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }
     }
+
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
@@ -40,7 +49,7 @@ public class PlayerRespawn : MonoBehaviour
         {
             currentCheckpoint = collision.transform;
 
-            if (checkpoint != null) // Ses dosyasý atanmýþ mý?
+            if (checkpoint != null) // Ses dosyasï¿½ atanmï¿½ï¿½ mï¿½?
             {
                 SoundManager.instance.PlaySound(checkpoint);
             }

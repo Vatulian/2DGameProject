@@ -3,6 +3,8 @@ using UnityEngine.UI;
 
 public class Boss : MonoBehaviour
 {
+    private Vector3 spawnPosition;
+
     [Header("Stats")]
     public int health = 20;
     public int damage = 1;
@@ -29,6 +31,7 @@ public class Boss : MonoBehaviour
 
     private void Start()
     {
+        spawnPosition = transform.position; // boss'un ilk spawn noktası
         anim = GetComponent<Animator>();
         hitFlash = GetComponent<HitFlash>();
         hitVfx = GetComponent<BossHitVFX>();
@@ -137,4 +140,33 @@ public class Boss : MonoBehaviour
             cam.Unlock();
         }
     }
+    public void ResetBoss()
+    {
+        isDead = false;
+        stageTwoTriggered = false;
+
+        // Pozisyon reset
+        transform.position = spawnPosition;
+
+        // HP reset
+        health = 20; // max HP
+        timeBtwDamage = 0f;
+
+        // Animator reset
+        if (anim != null)
+        {
+            anim.Rebind();
+            anim.Update(0f);
+        }
+
+        // Health bar reset
+        if (healthBar != null)
+        {
+            healthBar.maxValue = health;
+            healthBar.value = health;
+            healthBar.gameObject.SetActive(false);
+        }
+    }
+
+
 }
