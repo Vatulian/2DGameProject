@@ -31,10 +31,13 @@ public class PlayerMovement : MonoBehaviour
     //Jump
     private bool _isJumpCut;
     private bool _isJumpFalling;
+    private bool _jumpPressedThisFrame;
 
     //Wall Jump
     private float _wallJumpStartTime;
     private int _lastWallJumpDir;
+    private bool _isTouchingWallRight;
+    private bool _isTouchingWallLeft;
 
     //Dash
     private int _dashesLeft;
@@ -140,6 +143,12 @@ public class PlayerMovement : MonoBehaviour
         #region COLLISION CHECKS
         if (!IsDashing)
         {
+            _isTouchingWallRight = (Physics2D.OverlapBox(_frontWallCheckPoint.position, _wallCheckSize, 0, _wallLayer) && IsFacingRight)
+                || (Physics2D.OverlapBox(_backWallCheckPoint.position, _wallCheckSize, 0, _wallLayer) && !IsFacingRight);
+
+            _isTouchingWallLeft = (Physics2D.OverlapBox(_frontWallCheckPoint.position, _wallCheckSize, 0, _wallLayer) && !IsFacingRight)
+                || (Physics2D.OverlapBox(_backWallCheckPoint.position, _wallCheckSize, 0, _wallLayer) && IsFacingRight);
+
             //Ground Check
             if (Physics2D.OverlapBox(_groundCheckPoint.position, _groundCheckSize, 0, _groundLayer)) //checks if set box overlaps with ground
             {
@@ -152,14 +161,12 @@ public class PlayerMovement : MonoBehaviour
             }
 
             //Right Wall Check
-            if (((Physics2D.OverlapBox(_frontWallCheckPoint.position, _wallCheckSize, 0, _wallLayer) && IsFacingRight)
-                    || (Physics2D.OverlapBox(_backWallCheckPoint.position, _wallCheckSize, 0, _wallLayer) && !IsFacingRight)) && !IsWallJumping)
-                LastOnWallRightTime = Data.coyoteTime;
+            if (_isTouchingWallRight && !IsWallJumping)
+                LastOnWallRightTime = Data.wallCoyoteTime;
 
             //Left Wall Check
-            if (((Physics2D.OverlapBox(_frontWallCheckPoint.position, _wallCheckSize, 0, _wallLayer) && !IsFacingRight)
-                || (Physics2D.OverlapBox(_backWallCheckPoint.position, _wallCheckSize, 0, _wallLayer) && IsFacingRight)) && !IsWallJumping)
-                LastOnWallLeftTime = Data.coyoteTime;
+            if (_isTouchingWallLeft && !IsWallJumping)
+                LastOnWallLeftTime = Data.wallCoyoteTime;
 
             //Two checks needed for both left and right walls since whenever the play turns the wall checkPoints swap sides
             LastOnWallTime = Mathf.Max(LastOnWallLeftTime, LastOnWallRightTime);
@@ -213,7 +220,7 @@ public class PlayerMovement : MonoBehaviour
                 //AnimHandler.startedJumping = true;
             }
             //WALL JUMP
-            else if (CanWallJump() && LastPressedJumpTime > 0)
+            else if (CanWallJump())
             {
                 IsWallJumping = true;
                 IsJumping = false;
@@ -288,7 +295,7 @@ public class PlayerMovement : MonoBehaviour
                 SetGravityScale(Data.gravityScale * Data.jumpCutGravityMult);
                 RB.velocity = new Vector2(RB.velocity.x, Mathf.Max(RB.velocity.y, -Data.maxFallSpeed));
             }
-            else if ((IsJumping || IsWallJumping || _isJumpFalling) && Mathf.Abs(RB.velocity.y) < Data.jumpHangTimeThreshold)
+            else if ((IsJumping || _isJumpFalling) && Mathf.Abs(RB.velocity.y) < Data.jumpHangTimeThreshold)
             {
                 SetGravityScale(Data.gravityScale * Data.jumpHangGravityMult);
             }
@@ -338,6 +345,7 @@ public class PlayerMovement : MonoBehaviour
     public void OnJumpInput()
     {
         LastPressedJumpTime = Data.jumpInputBufferTime;
+        _jumpPressedThisFrame = true;
     }
 
     public void OnJumpUpInput()
@@ -396,7 +404,7 @@ public class PlayerMovement : MonoBehaviour
 
         #region Add Bonus Jump Apex Acceleration
         //Increase are acceleration and maxSpeed when at the apex of their jump, makes the jump feel a bit more bouncy, responsive and natural
-        if ((IsJumping || IsWallJumping || _isJumpFalling) && Mathf.Abs(RB.velocity.y) < Data.jumpHangTimeThreshold)
+        if ((IsJumping || _isJumpFalling) && Mathf.Abs(RB.velocity.y) < Data.jumpHangTimeThreshold)
         {
             accelRate *= Data.jumpHangAccelerationMult;
             targetSpeed *= Data.jumpHangMaxSpeedMult;
@@ -607,8 +615,11 @@ public class PlayerMovement : MonoBehaviour
 
     private bool CanWallJump()
     {
-        return LastPressedJumpTime > 0 && LastOnWallTime > 0 && LastOnGroundTime <= 0 && (!IsWallJumping ||
-             (LastOnWallRightTime > 0 && _lastWallJumpDir == 1) || (LastOnWallLeftTime > 0 && _lastWallJumpDir == -1));
+        bool isTouchingWallNow = _isTouchingWallRight || _isTouchingWallLeft;
+        bool canRepeatFromSameWall = (LastOnWallRightTime > 0 && _lastWallJumpDir == 1)
+            || (LastOnWallLeftTime > 0 && _lastWallJumpDir == -1);
+
+        return _jumpPressedThisFrame && (isTouchingWallNow || LastOnWallTime > 0) && LastOnGroundTime <= 0 && (!IsWallJumping || canRepeatFromSameWall);
     }
 
     private bool CanJumpCut()
@@ -656,5 +667,10 @@ public class PlayerMovement : MonoBehaviour
     public bool canAttack()
     {
         return !IsDashing && !IsWallJumping && !IsSliding;
+    }
+
+    private void LateUpdate()
+    {
+        _jumpPressedThisFrame = false;
     }
 }

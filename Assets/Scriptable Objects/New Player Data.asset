@@ -30,7 +30,7 @@ MonoBehaviour:
   jumpTimeToApex: 0.5
   jumpForce: 18
   jumpCutGravityMult: 2.5
-  jumpHangGravityMult: 0.801
+  jumpHangGravityMult: 0.9
   jumpHangTimeThreshold: 1
   jumpHangAccelerationMult: 1.1
   jumpHangMaxSpeedMult: 1.3
@@ -45,6 +45,7 @@ MonoBehaviour:
   slideSpeed: -3
   slideAccel: 8
   coyoteTime: 0.201
+  wallCoyoteTime: 0.01
   jumpInputBufferTime: 0.201
   dashAmount: 1
   dashSpeed: 30

@@ -20,12 +20,14 @@ public class CameraController : MonoBehaviour
 
     [Header("Follow")]
     [FormerlySerializedAs("aheadDistance")]
-    [SerializeField] private float aheadDistance = 2f;
+    [Range(0f, 0.25f)]
+    [SerializeField] private float lookAheadScreenOffset = 0.12f;
     [SerializeField] private float verticalOffset = 0.75f;
     [FormerlySerializedAs("followLerpSpeed")]
     [SerializeField] private float followLerpSpeed = 5f;
     [SerializeField] private float verticalFollowLerpSpeed = 9f;
     [SerializeField] private bool snapToPlayerOnStart = true;
+    [SerializeField] private float screenOffsetLerpSpeed = 6f;
 
     [Header("Cinemachine Feel")]
     [SerializeField] private float horizontalDamping = 0.45f;
@@ -59,6 +61,7 @@ public class CameraController : MonoBehaviour
     private Vector3 releaseStartPosition;
     private float releaseTimer;
     private float currentZoomVelocity;
+    private float currentScreenX;
 
     private void Awake()
     {
@@ -90,6 +93,8 @@ public class CameraController : MonoBehaviour
         deadZoneHeight = Mathf.Clamp01(deadZoneHeight);
         screenX = Mathf.Clamp01(screenX);
         screenY = Mathf.Clamp01(screenY);
+        lookAheadScreenOffset = Mathf.Clamp(lookAheadScreenOffset, 0f, 0.25f);
+        screenOffsetLerpSpeed = Mathf.Max(0.01f, screenOffsetLerpSpeed);
 
         if (!Application.isPlaying)
         {
@@ -111,6 +116,7 @@ public class CameraController : MonoBehaviour
 
         UpdateModeState();
         UpdateFollowTarget();
+        UpdateScreenComposition();
         UpdateZoom();
     }
 
@@ -220,6 +226,7 @@ public class CameraController : MonoBehaviour
         Vector3 startPosition = isLocked ? lockedPosition : CalculateFollowPosition();
         startPosition.z = 0f;
         followTarget.position = startPosition;
+        currentScreenX = GetTargetScreenX();
 
         if (cam != null)
         {
@@ -251,7 +258,7 @@ public class CameraController : MonoBehaviour
         framingTransposer.m_XDamping = horizontalDamping;
         framingTransposer.m_YDamping = verticalDamping;
         framingTransposer.m_ZDamping = 0f;
-        framingTransposer.m_ScreenX = screenX;
+        framingTransposer.m_ScreenX = Application.isPlaying ? currentScreenX : GetTargetScreenX();
         framingTransposer.m_ScreenY = screenY;
         framingTransposer.m_DeadZoneWidth = deadZoneWidth;
         framingTransposer.m_DeadZoneHeight = deadZoneHeight;
@@ -341,6 +348,19 @@ public class CameraController : MonoBehaviour
         cam.orthographicSize = nextSize;
     }
 
+    private void UpdateScreenComposition()
+    {
+        if (framingTransposer == null)
+        {
+            return;
+        }
+
+        float targetScreenX = GetTargetScreenX();
+        float lerpT = 1f - Mathf.Exp(-screenOffsetLerpSpeed * Time.deltaTime);
+        currentScreenX = Mathf.Lerp(currentScreenX, targetScreenX, lerpT);
+        framingTransposer.m_ScreenX = currentScreenX;
+    }
+
     private Vector3 CalculateFollowPosition()
     {
         if (player == null)
@@ -348,8 +368,7 @@ public class CameraController : MonoBehaviour
             return followTarget != null ? followTarget.position : transform.position;
         }
 
-        float facing = ResolveFacingDirection();
-        float x = player.position.x + aheadDistance * facing;
+        float x = player.position.x;
         float y = player.position.y + verticalOffset;
         return new Vector3(x, y, 0f);
     }
@@ -361,6 +380,12 @@ public class CameraController : MonoBehaviour
             return 1f;
         }
 
+        PlayerMovement playerMovement = player.GetComponent<PlayerMovement>();
+        if (playerMovement != null)
+        {
+            return playerMovement.IsFacingRight ? 1f : -1f;
+        }
+
         SpriteRenderer spriteRenderer = player.GetComponentInChildren<SpriteRenderer>();
         if (spriteRenderer != null)
         {
@@ -369,6 +394,17 @@ public class CameraController : MonoBehaviour
 
         float direction = player.lossyScale.x;
         return Mathf.Approximately(direction, 0f) ? 1f : Mathf.Sign(direction);
+    }
+
+    private float GetTargetScreenX()
+    {
+        if (currentMode == CameraMode.Locked)
+        {
+            return screenX;
+        }
+
+        float facing = ResolveFacingDirection();
+        return Mathf.Clamp01(screenX - (facing * lookAheadScreenOffset));
     }
 
     private Transform FindSiblingTransform(string objectName)
