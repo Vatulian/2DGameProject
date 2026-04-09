@@ -28,9 +28,9 @@ public class EnemyPatrol : MonoBehaviour
 
     private void OnEnable()
     {
-        // Patrol tekrar etkinleştirildiğinde, animasyonun doğru şekilde başlamasını sağla
+        // Patrol tekrar etkinleÅŸtirildiÄŸinde, animasyonun doÄŸru ÅŸekilde baÅŸlamasÄ±nÄ± saÄŸla
         anim.SetBool("Moving", true);
-        idleTimer = 0; // Idle süresini sıfırla
+        idleTimer = 0; // Idle sÃ¼resini sÄ±fÄ±rla
     }
 
     private void OnDisable()

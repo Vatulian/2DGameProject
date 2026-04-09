@@ -12,38 +12,42 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3cbcaba972d20564bab1f84fcfbc127e, type: 3}
   m_Name: New Player Data
   m_EditorClassIdentifier: 
-  gravityStrength: -77.77777
-  gravityScale: 7.9284167
-  fallGravityMult: 1.5
-  maxFallSpeed: 25
-  fastFallGravityMult: 2
-  maxFastFallSpeed: 30
-  runMaxSpeed: 11
-  runAcceleration: 2.5
-  runAccelAmount: 11.363636
-  runDecceleration: 5
-  runDeccelAmount: 22.727272
-  accelInAir: 0.65
-  deccelInAir: 0.65
-  doConserveMomentum: 1
-  jumpHeight: 3.5
-  jumpTimeToApex: 0.3
-  jumpForce: 23.333332
-  jumpCutGravityMult: 2
-  jumpHangGravityMult: 0.5
+  gravityStrength: -36
+  gravityScale: 3.6697247
+  fallGravityMult: 2
+  maxFallSpeed: 18
+  fastFallGravityMult: 1
+  maxFastFallSpeed: 20
+  runMaxSpeed: 9
+  runAcceleration: 9
+  runAccelAmount: 50
+  runDecceleration: 9
+  runDeccelAmount: 50
+  accelInAir: 1
+  deccelInAir: 1
+  doConserveMomentum: 0
+  jumpHeight: 4.5
+  jumpTimeToApex: 0.5
+  jumpForce: 18
+  jumpCutGravityMult: 2.5
+  jumpHangGravityMult: 0.801
   jumpHangTimeThreshold: 1
   jumpHangAccelerationMult: 1.1
   jumpHangMaxSpeedMult: 1.3
-  wallJumpForce: {x: 15, y: 20}
-  wallJumpRunLerp: 0.5
-  wallJumpTime: 0.15
+  extraJumpCount: 1
+  extraJumpForceMultiplier: 0.789
+  wallJumpForce: {x: 25, y: 18}
+  wallJumpRunLerp: 0.1
+  wallJumpTime: 0.2
   doTurnOnWallJump: 1
-  slideSpeed: 0
-  slideAccel: 0
-  coyoteTime: 0.1
-  jumpInputBufferTime: 0.1
+  wallJumpInputLockTime: 0.15
+  wallClingTime: 0.15
+  slideSpeed: -3
+  slideAccel: 8
+  coyoteTime: 0.201
+  jumpInputBufferTime: 0.201
   dashAmount: 1
-  dashSpeed: 20
+  dashSpeed: 30
   dashSleepTime: 0
   dashAttackTime: 0.15
   dashEndTime: 0.15

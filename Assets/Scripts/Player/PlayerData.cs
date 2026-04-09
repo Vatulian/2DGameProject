@@ -44,6 +44,10 @@ public class PlayerData : ScriptableObject
     public float jumpHangAccelerationMult;
     public float jumpHangMaxSpeedMult;
 
+    [Header("Extra Jump")]
+    public int extraJumpCount = 1; //How many extra jumps the player can perform in air
+    [Range(0.5f, 1.5f)] public float extraJumpForceMultiplier = 1f; //Multiplier for extra jump force compared to normal jump
+
     [Header("Wall Jump")]
     public Vector2 wallJumpForce; //The actual force (this time set by us) applied to the player when wall jumping.
     [Space(5)]
@@ -51,10 +55,14 @@ public class PlayerData : ScriptableObject
     [Range(0f, 1.5f)] public float wallJumpTime; //Time after wall jumping the player's movement is slowed for.
     public bool doTurnOnWallJump; //Player will rotate to face wall jumping direction
 
+    [Header("Wall Settings")]
+    [Range(0f, 0.3f)] public float wallJumpInputLockTime = 0.15f; //Short delay before allowing flip/input influence after wall jump
+    [Range(0f, 0.5f)] public float wallClingTime = 0.15f; //How long the player sticks to the wall before starting to slide
+
     [Space(20)]
 
     [Header("Slide")]
-    public float slideSpeed;
+    public float slideSpeed; //Use a negative value for downward wall slide, e.g. -3
     public float slideAccel;
 
     [Header("Assists")]
@@ -78,7 +86,6 @@ public class PlayerData : ScriptableObject
     [Space(5)]
     [Range(0.01f, 0.5f)] public float dashInputBufferTime;
 
-
     //Unity Callback, called when the inspector updates
     private void OnValidate()
     {
@@ -98,6 +105,7 @@ public class PlayerData : ScriptableObject
         #region Variable Ranges
         runAcceleration = Mathf.Clamp(runAcceleration, 0.01f, runMaxSpeed);
         runDecceleration = Mathf.Clamp(runDecceleration, 0.01f, runMaxSpeed);
+        extraJumpCount = Mathf.Max(0, extraJumpCount);
         #endregion
     }
 }

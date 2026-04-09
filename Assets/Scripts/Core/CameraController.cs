@@ -1,138 +1,401 @@
+using Cinemachine;
 using UnityEngine;
+using UnityEngine.Serialization;
 
+[DisallowMultipleComponent]
 [RequireComponent(typeof(Camera))]
 public class CameraController : MonoBehaviour
 {
-    [Header("Follow Player")]
+    private enum CameraMode
+    {
+        Follow,
+        Locked,
+        Releasing
+    }
+
+    [Header("References")]
     [SerializeField] private Transform player;
+    [SerializeField] private CinemachineVirtualCamera virtualCamera;
+    [SerializeField] private Transform followTarget;
+
+    [Header("Follow")]
+    [FormerlySerializedAs("aheadDistance")]
     [SerializeField] private float aheadDistance = 2f;
-    [SerializeField] private float followLerpSpeed = 5f;   // normal takip hızı
+    [SerializeField] private float verticalOffset = 0.75f;
+    [FormerlySerializedAs("followLerpSpeed")]
+    [SerializeField] private float followLerpSpeed = 5f;
+    [SerializeField] private float verticalFollowLerpSpeed = 9f;
+    [SerializeField] private bool snapToPlayerOnStart = true;
+
+    [Header("Cinemachine Feel")]
+    [SerializeField] private float horizontalDamping = 0.45f;
+    [SerializeField] private float verticalDamping = 0.2f;
+    [SerializeField] private float screenX = 0.5f;
+    [SerializeField] private float screenY = 0.55f;
+    [SerializeField] private float deadZoneWidth = 0.05f;
+    [SerializeField] private float deadZoneHeight = 0.12f;
 
     [Header("Zoom")]
-    [SerializeField] private float normalSize = 5f;   // normal oyun boyutu
-    [SerializeField] private float bossSize = 7f;     // boss arenası boyutu
+    [SerializeField] private float normalSize = 5f;
+    [SerializeField] private float bossSize = 7f;
+    [FormerlySerializedAs("zoomLerpSpeed")]
     [SerializeField] private float zoomLerpSpeed = 3f;
 
     [Header("Lock Settings")]
-    [SerializeField] private bool isLocked = false;       // şu anda boss lock modunda mı
-    [SerializeField] private Vector3 lockedPosition;      // boss arenanın merkezi
-    [SerializeField] private bool useBossZoom = false;    // lock sırasında boss zoom mu kullanılsın
-    [SerializeField] private float lockLerpSpeed = 2f;    // boss’a kilitlenirken hız
+    [SerializeField] private bool isLocked;
+    [SerializeField] private Vector3 lockedPosition;
+    [SerializeField] private bool useBossZoom;
+    [FormerlySerializedAs("lockLerpSpeed")]
+    [SerializeField] private float lockLerpSpeed = 2f;
 
     [Header("Release From Lock")]
-    [SerializeField] private float releaseDuration = 1.0f; // boss’tan player’a dönüş süresi (sn)
-    private bool isReleasingFromLock;
-    private float releaseTimer;
-    private Vector3 releaseStartPos;
+    [SerializeField] private float releaseDuration = 1f;
+    [SerializeField] private AnimationCurve releaseCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
+    private CameraMode currentMode;
     private Camera cam;
-    private float lookAhead;
+    private CinemachineFramingTransposer framingTransposer;
+    private Vector3 followVelocity;
+    private Vector3 releaseStartPosition;
+    private float releaseTimer;
+    private float currentZoomVelocity;
 
     private void Awake()
     {
         cam = GetComponent<Camera>();
+        EnsureCameraRig();
+        ResolvePlayerReference();
+        InitializeFollowTarget();
+        ApplyCinemachineSettings();
+    }
+
+    private void OnEnable()
+    {
+        EnsureCameraRig();
+        ApplyCinemachineSettings();
+    }
+
+    private void OnValidate()
+    {
+        followLerpSpeed = Mathf.Max(0.01f, followLerpSpeed);
+        verticalFollowLerpSpeed = Mathf.Max(0.01f, verticalFollowLerpSpeed);
+        lockLerpSpeed = Mathf.Max(0.01f, lockLerpSpeed);
+        zoomLerpSpeed = Mathf.Max(0.01f, zoomLerpSpeed);
+        releaseDuration = Mathf.Max(0.01f, releaseDuration);
+        normalSize = Mathf.Max(0.1f, normalSize);
+        bossSize = Mathf.Max(normalSize, bossSize);
+        horizontalDamping = Mathf.Max(0f, horizontalDamping);
+        verticalDamping = Mathf.Max(0f, verticalDamping);
+        deadZoneWidth = Mathf.Clamp01(deadZoneWidth);
+        deadZoneHeight = Mathf.Clamp01(deadZoneHeight);
+        screenX = Mathf.Clamp01(screenX);
+        screenY = Mathf.Clamp01(screenY);
+
+        if (!Application.isPlaying)
+        {
+            cam = GetComponent<Camera>();
+            EnsureCameraRig();
+        }
+
+        ApplyCinemachineSettings();
     }
 
     private void LateUpdate()
     {
-        if (cam == null) return;
+        ResolvePlayerReference();
 
-        // 1) KAMERA BOSS’A KİLİTLİYKEN
-        if (isLocked)
+        if (followTarget == null || virtualCamera == null || cam == null)
         {
-            // Pozisyonu lockedPosition’a doğru yumuşak taşır
-            Vector3 targetPos = new Vector3(lockedPosition.x, lockedPosition.y, transform.position.z);
-            transform.position = Vector3.Lerp(transform.position, targetPos, lockLerpSpeed * Time.deltaTime);
-
-            // Zoom’u bossSize’a doğru taşır (useBossZoom true ise)
-            float targetSize = useBossZoom ? bossSize : normalSize;
-            cam.orthographicSize = Mathf.Lerp(cam.orthographicSize, targetSize, zoomLerpSpeed * Time.deltaTime);
             return;
         }
 
-        // 2) LOCK’TAN YUMUŞAK ÇIKIŞ MODU
-        if (isReleasingFromLock)
-        {
-            if (player == null)
-            {
-                isReleasingFromLock = false;
-                return;
-            }
-
-            releaseTimer += Time.deltaTime;
-            float t = Mathf.Clamp01(releaseTimer / releaseDuration);
-
-            // Player’a göre hedef pozisyonu hesapla (normal follow mantığı)
-            float desiredLookAhead = aheadDistance * Mathf.Sign(player.localScale.x);
-            lookAhead = Mathf.Lerp(lookAhead, desiredLookAhead, followLerpSpeed * Time.deltaTime);
-
-            float targetX = player.position.x + lookAhead;
-            float targetY = Mathf.Lerp(transform.position.y, player.position.y, followLerpSpeed * Time.deltaTime);
-            Vector3 followPos = new Vector3(targetX, targetY, transform.position.z);
-
-            // Kamera pozisyonunu releaseStartPos -> followPos arasında karıştır
-            transform.position = Vector3.Lerp(releaseStartPos, followPos, t);
-
-            // Zoom’u normalSize’a doğru getir
-            cam.orthographicSize = Mathf.Lerp(cam.orthographicSize, normalSize, zoomLerpSpeed * Time.deltaTime);
-
-            // Geçiş bittiğinde normal moda dön
-            if (t >= 0.999f)
-            {
-                isReleasingFromLock = false;
-            }
-
-            return;
-        }
-
-        // 3) NORMAL TAKİP MODU
-        if (player == null) return;
-
-        float targetAhead = aheadDistance * Mathf.Sign(player.localScale.x);
-        lookAhead = Mathf.Lerp(lookAhead, targetAhead, followLerpSpeed * Time.deltaTime);
-
-        float x = player.position.x + lookAhead;
-        float y = Mathf.Lerp(transform.position.y, player.position.y, followLerpSpeed * Time.deltaTime);
-
-        transform.position = new Vector3(x, y, transform.position.z);
-
-        // Zoom’u normal’e yumuşat
-        cam.orthographicSize = Mathf.Lerp(cam.orthographicSize, normalSize, zoomLerpSpeed * Time.deltaTime);
+        UpdateModeState();
+        UpdateFollowTarget();
+        UpdateZoom();
     }
 
-    // 🔒 Boss arenasına giriş (lock + isteğe bağlı boss zoom)
     public void LockToPosition(Vector3 worldPos, bool zoomToBoss = false)
     {
         lockedPosition = worldPos;
         isLocked = true;
         useBossZoom = zoomToBoss;
-
-        // Lock’a girerken devam eden release var ise iptal et
-        isReleasingFromLock = false;
+        currentMode = CameraMode.Locked;
     }
 
-    // 🔓 Lock’tan çıkış – default: smooth
     public void Unlock(bool smooth = true)
     {
-        // Artık locked değiliz
         isLocked = false;
         useBossZoom = false;
 
-        if (smooth && player != null)
+        if (smooth && player != null && followTarget != null)
         {
-            isReleasingFromLock = true;
+            currentMode = CameraMode.Releasing;
             releaseTimer = 0f;
-            releaseStartPos = transform.position;
+            releaseStartPosition = followTarget.position;
+            return;
         }
-        else
+
+        currentMode = CameraMode.Follow;
+
+        if (followTarget != null && player != null)
         {
-            isReleasingFromLock = false;
-            // Hard snap istersen burada direkt player’a alabilirsin, ama şimdilik gerek yok
+            followTarget.position = CalculateFollowPosition();
         }
     }
 
     public void SetPlayer(Transform newPlayer)
     {
         player = newPlayer;
+
+        if (snapToPlayerOnStart && followTarget != null && player != null)
+        {
+            followTarget.position = CalculateFollowPosition();
+        }
+    }
+
+    private void EnsureCameraRig()
+    {
+        if (cam == null)
+        {
+            cam = GetComponent<Camera>();
+        }
+
+        CinemachineBrain brain = GetComponent<CinemachineBrain>();
+        if (brain == null)
+        {
+            brain = gameObject.AddComponent<CinemachineBrain>();
+            brain.m_UpdateMethod = CinemachineBrain.UpdateMethod.SmartUpdate;
+            brain.m_BlendUpdateMethod = CinemachineBrain.BrainUpdateMethod.LateUpdate;
+            brain.m_DefaultBlend = new CinemachineBlendDefinition(CinemachineBlendDefinition.Style.EaseInOut, 0.35f);
+        }
+
+        Transform rigParent = transform.parent;
+
+        if (followTarget == null)
+        {
+            followTarget = FindSiblingTransform("CM Follow Target");
+            if (followTarget == null)
+            {
+                GameObject followObject = new GameObject("CM Follow Target");
+                followTarget = followObject.transform;
+                followTarget.SetParent(rigParent, false);
+            }
+        }
+
+        if (virtualCamera == null)
+        {
+            virtualCamera = FindSiblingVirtualCamera();
+        }
+
+        if (virtualCamera == null)
+        {
+            GameObject vcamObject = new GameObject("CM vcam");
+            Transform vcamTransform = vcamObject.transform;
+            vcamTransform.SetParent(rigParent, false);
+            virtualCamera = vcamObject.AddComponent<CinemachineVirtualCamera>();
+        }
+
+        virtualCamera.Priority = 100;
+        virtualCamera.Follow = followTarget;
+        virtualCamera.LookAt = null;
+        virtualCamera.m_Lens.Orthographic = true;
+
+        framingTransposer = virtualCamera.GetCinemachineComponent<CinemachineFramingTransposer>();
+        if (framingTransposer == null)
+        {
+            virtualCamera.AddCinemachineComponent<CinemachineFramingTransposer>();
+            framingTransposer = virtualCamera.GetCinemachineComponent<CinemachineFramingTransposer>();
+        }
+    }
+
+    private void InitializeFollowTarget()
+    {
+        currentMode = isLocked ? CameraMode.Locked : CameraMode.Follow;
+
+        if (followTarget == null)
+        {
+            return;
+        }
+
+        Vector3 startPosition = isLocked ? lockedPosition : CalculateFollowPosition();
+        startPosition.z = 0f;
+        followTarget.position = startPosition;
+
+        if (cam != null)
+        {
+            cam.orthographicSize = useBossZoom ? bossSize : normalSize;
+        }
+    }
+
+    private void ApplyCinemachineSettings()
+    {
+        if (virtualCamera == null)
+        {
+            return;
+        }
+
+        virtualCamera.m_Lens.Orthographic = true;
+        virtualCamera.m_Lens.OrthographicSize = cam != null ? cam.orthographicSize : normalSize;
+
+        if (followTarget != null)
+        {
+            virtualCamera.Follow = followTarget;
+        }
+
+        framingTransposer = virtualCamera.GetCinemachineComponent<CinemachineFramingTransposer>();
+        if (framingTransposer == null)
+        {
+            return;
+        }
+
+        framingTransposer.m_XDamping = horizontalDamping;
+        framingTransposer.m_YDamping = verticalDamping;
+        framingTransposer.m_ZDamping = 0f;
+        framingTransposer.m_ScreenX = screenX;
+        framingTransposer.m_ScreenY = screenY;
+        framingTransposer.m_DeadZoneWidth = deadZoneWidth;
+        framingTransposer.m_DeadZoneHeight = deadZoneHeight;
+        framingTransposer.m_UnlimitedSoftZone = false;
+        framingTransposer.m_BiasX = 0f;
+        framingTransposer.m_BiasY = 0f;
+    }
+
+    private void ResolvePlayerReference()
+    {
+        if (player != null)
+        {
+            return;
+        }
+
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        if (playerObject != null)
+        {
+            player = playerObject.transform;
+        }
+    }
+
+    private void UpdateModeState()
+    {
+        if (isLocked)
+        {
+            currentMode = CameraMode.Locked;
+            return;
+        }
+
+        if (currentMode == CameraMode.Locked)
+        {
+            currentMode = CameraMode.Follow;
+        }
+    }
+
+    private void UpdateFollowTarget()
+    {
+        Vector3 desiredPosition;
+        float smoothTime = 1f / followLerpSpeed;
+
+        switch (currentMode)
+        {
+            case CameraMode.Locked:
+                desiredPosition = new Vector3(lockedPosition.x, lockedPosition.y, 0f);
+                followTarget.position = SmoothDampPerAxis(followTarget.position, desiredPosition, lockLerpSpeed, lockLerpSpeed);
+                break;
+
+            case CameraMode.Releasing:
+                if (player == null)
+                {
+                    currentMode = CameraMode.Follow;
+                    return;
+                }
+
+                releaseTimer += Time.deltaTime;
+                float releaseT = Mathf.Clamp01(releaseTimer / releaseDuration);
+                desiredPosition = CalculateFollowPosition();
+                followTarget.position = Vector3.Lerp(releaseStartPosition, desiredPosition, releaseCurve.Evaluate(releaseT));
+
+                if (releaseT >= 0.999f)
+                {
+                    currentMode = CameraMode.Follow;
+                    followTarget.position = desiredPosition;
+                }
+                break;
+
+            default:
+                if (player == null)
+                {
+                    return;
+                }
+
+                desiredPosition = CalculateFollowPosition();
+                followTarget.position = SmoothDampPerAxis(followTarget.position, desiredPosition, followLerpSpeed, verticalFollowLerpSpeed);
+                break;
+        }
+    }
+
+    private void UpdateZoom()
+    {
+        float targetSize = useBossZoom && isLocked ? bossSize : normalSize;
+        float smoothTime = 1f / zoomLerpSpeed;
+        float nextSize = Mathf.SmoothDamp(virtualCamera.m_Lens.OrthographicSize, targetSize, ref currentZoomVelocity, smoothTime);
+
+        virtualCamera.m_Lens.OrthographicSize = nextSize;
+        cam.orthographicSize = nextSize;
+    }
+
+    private Vector3 CalculateFollowPosition()
+    {
+        if (player == null)
+        {
+            return followTarget != null ? followTarget.position : transform.position;
+        }
+
+        float facing = ResolveFacingDirection();
+        float x = player.position.x + aheadDistance * facing;
+        float y = player.position.y + verticalOffset;
+        return new Vector3(x, y, 0f);
+    }
+
+    private float ResolveFacingDirection()
+    {
+        if (player == null)
+        {
+            return 1f;
+        }
+
+        SpriteRenderer spriteRenderer = player.GetComponentInChildren<SpriteRenderer>();
+        if (spriteRenderer != null)
+        {
+            return spriteRenderer.flipX ? -1f : 1f;
+        }
+
+        float direction = player.lossyScale.x;
+        return Mathf.Approximately(direction, 0f) ? 1f : Mathf.Sign(direction);
+    }
+
+    private Transform FindSiblingTransform(string objectName)
+    {
+        Transform parent = transform.parent;
+        if (parent == null)
+        {
+            return null;
+        }
+
+        Transform sibling = parent.Find(objectName);
+        return sibling != null && sibling != transform ? sibling : null;
+    }
+
+    private CinemachineVirtualCamera FindSiblingVirtualCamera()
+    {
+        Transform sibling = FindSiblingTransform("CM vcam");
+        return sibling != null ? sibling.GetComponent<CinemachineVirtualCamera>() : null;
+    }
+
+    private Vector3 SmoothDampPerAxis(Vector3 current, Vector3 target, float horizontalSpeed, float verticalSpeed)
+    {
+        float horizontalSmoothTime = 1f / Mathf.Max(0.01f, horizontalSpeed);
+        float verticalSmoothTime = 1f / Mathf.Max(0.01f, verticalSpeed);
+
+        float x = Mathf.SmoothDamp(current.x, target.x, ref followVelocity.x, horizontalSmoothTime);
+        float y = Mathf.SmoothDamp(current.y, target.y, ref followVelocity.y, verticalSmoothTime);
+        return new Vector3(x, y, target.z);
     }
 }

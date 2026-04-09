@@ -42,6 +42,13 @@ public class PlayerMovement : MonoBehaviour
     private Vector2 _lastDashDir;
     private bool _isDashAttacking;
 
+    //Extra Jump
+    private int _extraJumpsLeft;
+
+    [Header("Wall Runtime State")]
+    private float _wallClingStartTime;
+    private bool _wasOnWall;
+
     #endregion
 
     #region INPUT PARAMETERS
@@ -85,6 +92,8 @@ public class PlayerMovement : MonoBehaviour
     {
         SetGravityScale(Data.gravityScale);
         IsFacingRight = true;
+        _dashesLeft = Data.dashAmount;
+        _extraJumpsLeft = Data.extraJumpCount;
     }
 
     private void Update()
@@ -107,8 +116,9 @@ public class PlayerMovement : MonoBehaviour
         anim.SetBool("Run", _moveInput.x != 0);
         anim.SetBool("Grounded", !IsJumping && !IsDashing && !_isJumpCut && !_isJumpFalling && !IsWallJumping);
 
+        bool canFlip = !IsWallJumping || Time.time - _wallJumpStartTime > Data.wallJumpInputLockTime;
 
-        if (_moveInput.x != 0)
+        if (_moveInput.x != 0 && canFlip)
             CheckDirectionToFace(_moveInput.x > 0);
 
         if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.J))
@@ -128,7 +138,7 @@ public class PlayerMovement : MonoBehaviour
         #endregion
 
         #region COLLISION CHECKS
-        if (!IsDashing && !IsJumping)
+        if (!IsDashing)
         {
             //Ground Check
             if (Physics2D.OverlapBox(_groundCheckPoint.position, _groundCheckSize, 0, _groundLayer)) //checks if set box overlaps with ground
@@ -146,7 +156,7 @@ public class PlayerMovement : MonoBehaviour
                     || (Physics2D.OverlapBox(_backWallCheckPoint.position, _wallCheckSize, 0, _wallLayer) && !IsFacingRight)) && !IsWallJumping)
                 LastOnWallRightTime = Data.coyoteTime;
 
-            //Right Wall Check
+            //Left Wall Check
             if (((Physics2D.OverlapBox(_frontWallCheckPoint.position, _wallCheckSize, 0, _wallLayer) && !IsFacingRight)
                 || (Physics2D.OverlapBox(_backWallCheckPoint.position, _wallCheckSize, 0, _wallLayer) && IsFacingRight)) && !IsWallJumping)
                 LastOnWallLeftTime = Data.coyoteTime;
@@ -154,6 +164,17 @@ public class PlayerMovement : MonoBehaviour
             //Two checks needed for both left and right walls since whenever the play turns the wall checkPoints swap sides
             LastOnWallTime = Mathf.Max(LastOnWallLeftTime, LastOnWallRightTime);
         }
+        #endregion
+
+        #region WALL CLING TRACKING
+        bool onWallNow = LastOnWallTime > 0 && LastOnGroundTime <= 0;
+
+        if (onWallNow && !_wasOnWall)
+        {
+            _wallClingStartTime = Time.time;
+        }
+
+        _wasOnWall = onWallNow;
         #endregion
 
         #region JUMP CHECKS
@@ -174,6 +195,7 @@ public class PlayerMovement : MonoBehaviour
             _isJumpCut = false;
 
             _isJumpFalling = false;
+            _extraJumpsLeft = Data.extraJumpCount;
         }
 
         if (!IsDashing)
@@ -204,6 +226,17 @@ public class PlayerMovement : MonoBehaviour
                 WallJump(_lastWallJumpDir);
 
             }
+            //DOUBLE JUMP
+            else if (CanExtraJump() && LastPressedJumpTime > 0)
+            {
+                IsJumping = true;
+                IsWallJumping = false;
+                _isJumpCut = false;
+                _isJumpFalling = false;
+
+                ExtraJump();
+                anim.SetTrigger("Jump");
+            }
         }
         #endregion
 
@@ -213,13 +246,8 @@ public class PlayerMovement : MonoBehaviour
             //Freeze game for split second. Adds juiciness and a bit of forgiveness over directional input
             Sleep(Data.dashSleepTime);
 
-            //If not direction pressed, dash forward
-            if (_moveInput != Vector2.zero)
-                _lastDashDir = _moveInput;
-            else
-                _lastDashDir = IsFacingRight ? Vector2.right : Vector2.left;
-
-
+            //Dash always goes to the facing direction
+            _lastDashDir = IsFacingRight ? Vector2.right : Vector2.left;
 
             IsDashing = true;
             IsJumping = false;
@@ -231,7 +259,9 @@ public class PlayerMovement : MonoBehaviour
         #endregion
 
         #region SLIDE CHECKS
-        if (CanSlide() && ((LastOnWallLeftTime > 0 && _moveInput.x < 0) || (LastOnWallRightTime > 0 && _moveInput.x > 0)))
+        //Artık wall slide için duvara doğru input gerekmiyor.
+        //Duvara havadayken temas ettiğinde otomatik cling/slide başlar.
+        if (CanSlide())
             IsSliding = true;
         else
             IsSliding = false;
@@ -429,6 +459,21 @@ public class PlayerMovement : MonoBehaviour
         #endregion
     }
 
+    private void ExtraJump()
+    {
+        //Ensures we can't call extra jump multiple times from one press
+        LastPressedJumpTime = 0;
+        _extraJumpsLeft--;
+
+        #region Perform Extra Jump
+        //Double jump daha stabil olsun diye mevcut düşüş/yükseliş hızını sıfırlıyoruz
+        RB.velocity = new Vector2(RB.velocity.x, 0f);
+
+        float force = Data.jumpForce * Data.extraJumpForceMultiplier;
+        RB.AddForce(Vector2.up * force, ForceMode2D.Impulse);
+        #endregion
+    }
+
     private void WallJump(int dir)
     {
         //Ensures we can't call Wall Jump multiple times from one press
@@ -436,13 +481,17 @@ public class PlayerMovement : MonoBehaviour
         LastOnGroundTime = 0;
         LastOnWallRightTime = 0;
         LastOnWallLeftTime = 0;
+        LastOnWallTime = 0;
+
+        //Wall jump yaptıktan sonra extra jump hakkını kapat
+        _extraJumpsLeft = 0;
 
         #region Perform Wall Jump
         Vector2 force = new Vector2(Data.wallJumpForce.x, Data.wallJumpForce.y);
         force.x *= dir; //apply force in opposite direction of wall
 
-        if (Mathf.Sign(RB.velocity.x) != Mathf.Sign(force.x))
-            force.x -= RB.velocity.x;
+        //Eski yatay momentumu temizliyoruz ki wall jump daha consistent olsun
+        RB.velocity = new Vector2(0f, RB.velocity.y);
 
         if (RB.velocity.y < 0) //checks whether player is falling, if so we subtract the velocity.y (counteracting force of gravity). This ensures the player always reaches our desired jump force or greater
             force.y -= RB.velocity.y;
@@ -511,10 +560,19 @@ public class PlayerMovement : MonoBehaviour
     #region OTHER MOVEMENT METHODS
     private void Slide()
     {
+        float timeSinceWallTouch = Time.time - _wallClingStartTime;
+
+        //Duvara ilk temas edildiğinde kısa süre yapışık kal
+        if (timeSinceWallTouch < Data.wallClingTime)
+        {
+            RB.velocity = new Vector2(RB.velocity.x, 0f);
+            return;
+        }
+
         //We remove the remaining upwards Impulse to prevent upwards sliding
         if (RB.velocity.y > 0)
         {
-            RB.AddForce(-RB.velocity.y * Vector2.up, ForceMode2D.Impulse);
+            RB.velocity = new Vector2(RB.velocity.x, 0f);
         }
 
         //Works the same as the Run but only in the y-axis
@@ -540,6 +598,11 @@ public class PlayerMovement : MonoBehaviour
     private bool CanJump()
     {
         return LastOnGroundTime > 0 && !IsJumping;
+    }
+
+    private bool CanExtraJump()
+    {
+        return _extraJumpsLeft > 0 && LastOnGroundTime <= 0 && LastOnWallTime <= 0 && !IsWallJumping;
     }
 
     private bool CanWallJump()
@@ -585,15 +648,13 @@ public class PlayerMovement : MonoBehaviour
         Gizmos.DrawWireCube(_groundCheckPoint.position, _groundCheckSize);
         Gizmos.color = Color.blue;
         Gizmos.DrawWireCube(_frontWallCheckPoint.position, _wallCheckSize);
+        Gizmos.color = Color.blue;
         Gizmos.DrawWireCube(_backWallCheckPoint.position, _wallCheckSize);
     }
     #endregion
+
     public bool canAttack()
     {
         return !IsDashing && !IsWallJumping && !IsSliding;
     }
-
-
 }
-
-
