@@ -7,7 +7,10 @@ public class Health : MonoBehaviour
     [SerializeField] private float startingHealth;
     public float currentHealth { get; private set; }
     private Animator anim;
+    private PlayerAnimationController playerAnimationController;
+    private PlayerMeleeAttack playerMeleeAttack;
     private bool dead;
+    public bool IsDead => dead;
 
     private float checkpointHealth;
 
@@ -32,17 +35,26 @@ public class Health : MonoBehaviour
         currentHealth = startingHealth;
         checkpointHealth = currentHealth;
         anim = GetComponent<Animator>();
+        playerAnimationController = GetComponent<PlayerAnimationController>();
+        playerMeleeAttack = GetComponent<PlayerMeleeAttack>();
         spriteRend = GetComponent<SpriteRenderer>();
     }
 
     public void TakeDamage(float _damage)
     {
-        if (invulnerable) return;
+        if (playerAnimationController == null)
+            playerAnimationController = GetComponent<PlayerAnimationController>();
+        if (playerMeleeAttack == null)
+            playerMeleeAttack = GetComponent<PlayerMeleeAttack>();
+
+        if (invulnerable || dead) return;
         currentHealth = Mathf.Clamp(currentHealth - _damage, 0, startingHealth);
 
         if (currentHealth > 0)
         {
-            if (anim != null) anim.SetTrigger("Hurt");
+            playerMeleeAttack?.ResetCombo();
+            if (playerAnimationController != null) playerAnimationController.PlayHurt();
+            else if (anim != null) anim.SetTrigger("Hurt");
             StartCoroutine(Invunerability());
             if (hurtSound != null)
                 SoundManager.instance.PlaySound(hurtSound);
@@ -51,17 +63,23 @@ public class Health : MonoBehaviour
         {
             if (!dead)
             {
-                foreach (Behaviour component in components)
-                    if (component != null)
-                        component.enabled = false;
+                dead = true;
+                StopAllCoroutines();
+                Physics2D.IgnoreLayerCollision(10, 11, false);
+                invulnerable = false;
+                playerMeleeAttack?.ResetCombo(false);
 
-                if (anim != null)
+                if (playerAnimationController != null) playerAnimationController.PlayDeath();
+                else if (anim != null)
                 {
                     anim.SetBool("Grounded", true);
                     anim.SetTrigger("Die");
                 }
 
-                dead = true;
+                foreach (Behaviour component in components)
+                    if (ShouldDisableOnDeath(component))
+                        component.enabled = false;
+
                 if (deathSound != null)
                     SoundManager.instance.PlaySound(deathSound);
             }
@@ -100,9 +118,17 @@ public class Health : MonoBehaviour
 
     public void Respawn()
     {
+        if (playerAnimationController == null)
+            playerAnimationController = GetComponent<PlayerAnimationController>();
+        if (playerMeleeAttack == null)
+            playerMeleeAttack = GetComponent<PlayerMeleeAttack>();
+
         dead = false;
         currentHealth = checkpointHealth;
-        if (anim != null)
+        Physics2D.IgnoreLayerCollision(10, 11, false);
+        playerMeleeAttack?.ResetCombo(false);
+        if (playerAnimationController != null) playerAnimationController.PlayRespawn();
+        else if (anim != null)
         {
             anim.ResetTrigger("Die");
             anim.Play("Idle");
@@ -113,6 +139,16 @@ public class Health : MonoBehaviour
             if (component != null)
                 component.enabled = true;
     }
+
+    private bool ShouldDisableOnDeath(Behaviour component)
+    {
+        return component != null
+               && component != this
+               && component != anim
+               && component != playerAnimationController
+               && component is not PlayerRespawn;
+    }
+
     public bool Invulnerable => invulnerable;
 
 }

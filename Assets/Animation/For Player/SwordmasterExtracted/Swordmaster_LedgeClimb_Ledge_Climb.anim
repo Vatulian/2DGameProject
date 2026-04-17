@@ -1,0 +1,78 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!74 &7400000
+AnimationClip:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Swordmaster_LedgeClimb_Ledge_Climb
+  serializedVersion: 7
+  m_Legacy: 0
+  m_Compressed: 0
+  m_UseHighQualityCurve: 1
+  m_RotationCurves: []
+  m_CompressedRotationCurves: []
+  m_EulerCurves: []
+  m_PositionCurves: []
+  m_ScaleCurves: []
+  m_FloatCurves: []
+  m_PPtrCurves:
+  - serializedVersion: 2
+    curve:
+    - time: 0
+      value: {fileID: -8697720202650111925, guid: a866be5c8eccfab4b9dbeaded83b690b, type: 3}
+    - time: 0.099999964
+      value: {fileID: 7126250068663461783, guid: a866be5c8eccfab4b9dbeaded83b690b, type: 3}
+    - time: 0.19999999
+      value: {fileID: -5914899106626395640, guid: a866be5c8eccfab4b9dbeaded83b690b, type: 3}
+    - time: 0.29999995
+      value: {fileID: -329901175675834340, guid: a866be5c8eccfab4b9dbeaded83b690b, type: 3}
+    - time: 0.39999998
+      value: {fileID: -163490305578586352, guid: a866be5c8eccfab4b9dbeaded83b690b, type: 3}
+    - time: 0.5
+      value: {fileID: -8322175949945081834, guid: a866be5c8eccfab4b9dbeaded83b690b, type: 3}
+    - time: 0.6
+      value: {fileID: -6464392311333269321, guid: a866be5c8eccfab4b9dbeaded83b690b, type: 3}
+    - time: 0.6999999
+      value: {fileID: -6766414725020545159, guid: a866be5c8eccfab4b9dbeaded83b690b, type: 3}
+    - time: 0.78999996
+      value: {fileID: -6766414725020545159, guid: a866be5c8eccfab4b9dbeaded83b690b, type: 3}
+    attribute: m_Sprite
+    path: 
+    classID: 212
+    script: {fileID: 0}
+    flags: 2
+  m_SampleRate: 100
+  m_WrapMode: 0
+  m_Bounds:
+    m_Center: {x: 0, y: 0, z: 0}
+    m_Extent: {x: 0, y: 0, z: 0}
+  m_ClipBindingConstant:
+    genericBindings: []
+    pptrCurveMapping: []
+  m_AnimationClipSettings:
+    serializedVersion: 2
+    m_AdditiveReferencePoseClip: {fileID: 0}
+    m_AdditiveReferencePoseTime: 0
+    m_StartTime: 0
+    m_StopTime: 0.79999995
+    m_OrientationOffsetY: 0
+    m_Level: 0
+    m_CycleOffset: 0
+    m_HasAdditiveReferencePose: 0
+    m_LoopTime: 1
+    m_LoopBlend: 0
+    m_LoopBlendOrientation: 0
+    m_LoopBlendPositionY: 0
+    m_LoopBlendPositionXZ: 0
+    m_KeepOriginalOrientation: 0
+    m_KeepOriginalPositionY: 0
+    m_KeepOriginalPositionXZ: 0
+    m_HeightFromFeet: 0
+    m_Mirror: 0
+  m_EditorCurves: []
+  m_EulerEditorCurves: []
+  m_HasGenericRootTransform: 0
+  m_HasMotionFloatCurves: 0
+  m_Events: []

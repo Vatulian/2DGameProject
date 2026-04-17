@@ -4,56 +4,60 @@ public class PlayerAttack : MonoBehaviour
 {
     [SerializeField] private float attackCooldown = 0.25f;
     [SerializeField] private Transform firePoint;
-    [SerializeField] private GameObject[] fireballs;   // object pool
+    [SerializeField] private GameObject[] fireballs;
     [SerializeField] private AudioClip fireballSound;
 
+    private PlayerAnimationController animationController;
     private Animator anim;
     private PlayerMovement playerMovement;
+    private Health health;
     private float cooldownTimer = 0f;
 
     private void Awake()
     {
+        animationController = GetComponent<PlayerAnimationController>();
         anim = GetComponent<Animator>();
         playerMovement = GetComponent<PlayerMovement>();
+        health = GetComponent<Health>();
     }
 
     private void Update()
     {
         cooldownTimer -= Time.deltaTime;
 
-        // Tek tıklama ile ateş (basılı tutup otomatik ateş istersen altta opsiyon var)
-        if (Input.GetMouseButtonDown(0) && cooldownTimer <= 0f && playerMovement != null && playerMovement.canAttack())
-        {
-            FireOnce();
-        }
+        if (health != null && health.IsDead)
+            return;
 
-        /*  // *** OPSİYONEL: basılı tutarak auto-fire ***
-        if (Input.GetMouseButton(0) && cooldownTimer <= 0f && playerMovement != null && playerMovement.canAttack())
-        {
+        if (Input.GetMouseButtonDown(0) && cooldownTimer <= 0f && playerMovement != null && playerMovement.canAttack())
             FireOnce();
-        }
-        */
     }
 
     private void FireOnce()
     {
+        if (animationController == null)
+            animationController = GetComponent<PlayerAnimationController>();
+
         int idx = FindInactiveFireball();
-        if (idx < 0) return;
+        if (idx < 0)
+            return;
 
         cooldownTimer = attackCooldown;
 
-        if (anim) anim.SetTrigger("Attack");
-        if (SoundManager.instance && fireballSound) SoundManager.instance.PlaySound(fireballSound);
+        if (animationController != null) animationController.PlayAttack();
+        else if (anim != null) anim.SetTrigger("Attack");
+
+        if (SoundManager.instance && fireballSound)
+            SoundManager.instance.PlaySound(fireballSound);
 
         GameObject go = fireballs[idx];
         go.transform.position = firePoint.position;
 
         float dir = Mathf.Sign(transform.localScale.x);
-        var proj = go.GetComponent<Projectile>();
+        Projectile proj = go.GetComponent<Projectile>();
         if (proj != null)
-            proj.Fire(transform, dir);      // owner gönder → self-hit yok, spawn patlaması yok
+            proj.Fire(transform, dir);
         else
-            go.GetComponent<Projectile>()?.SetDirection(dir); // geriye uyumluluk, gerekmezse silebilirsin
+            go.GetComponent<Projectile>()?.SetDirection(dir);
     }
 
     private int FindInactiveFireball()
@@ -61,6 +65,7 @@ public class PlayerAttack : MonoBehaviour
         for (int i = 0; i < fireballs.Length; i++)
             if (!fireballs[i].activeInHierarchy)
                 return i;
+
         return -1;
     }
 }

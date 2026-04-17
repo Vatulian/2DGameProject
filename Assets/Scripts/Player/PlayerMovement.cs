@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 
+[RequireComponent(typeof(PlayerAnimationController))]
 public class PlayerMovement : MonoBehaviour
 {
     
@@ -79,7 +80,11 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private LayerMask _wallLayer;
 
     //Animation
-    private Animator anim;
+    private PlayerAnimationController animationController;
+    private float externalRunMultiplier = 1f;
+    private float forcedHorizontalVelocity;
+    private float forcedHorizontalVelocityTimer;
+    private Health health;
 
     #endregion
 
@@ -87,7 +92,10 @@ public class PlayerMovement : MonoBehaviour
     {
         RB = GetComponent<Rigidbody2D>();
         //AnimHandler = GetComponent<PlayerAnimator>();
-        anim = GetComponent<Animator>();
+        animationController = GetComponent<PlayerAnimationController>();
+        if (!animationController)
+            animationController = gameObject.AddComponent<PlayerAnimationController>();
+        health = GetComponent<Health>();
 
     }
 
@@ -101,6 +109,12 @@ public class PlayerMovement : MonoBehaviour
 
     private void Update()
     {
+        if (health != null && health.IsDead)
+            return;
+
+        if (forcedHorizontalVelocityTimer > 0f)
+            forcedHorizontalVelocityTimer -= Time.deltaTime;
+
         #region TIMERS
         LastOnGroundTime -= Time.deltaTime;
         LastOnWallTime -= Time.deltaTime;
@@ -114,10 +128,6 @@ public class PlayerMovement : MonoBehaviour
         #region INPUT HANDLER
         _moveInput.x = Input.GetAxisRaw("Horizontal");
         _moveInput.y = Input.GetAxisRaw("Vertical");
-
-        //Set animator parameters
-        anim.SetBool("Run", _moveInput.x != 0);
-        anim.SetBool("Grounded", !IsJumping && !IsDashing && !_isJumpCut && !_isJumpFalling && !IsWallJumping);
 
         bool canFlip = !IsWallJumping || Time.time - _wallJumpStartTime > Data.wallJumpInputLockTime;
 
@@ -215,7 +225,7 @@ public class PlayerMovement : MonoBehaviour
                 _isJumpCut = false;
                 _isJumpFalling = false;
                 Jump();
-                anim.SetTrigger("Jump");
+                animationController?.PlayJump();
 
                 //AnimHandler.startedJumping = true;
             }
@@ -242,7 +252,7 @@ public class PlayerMovement : MonoBehaviour
                 _isJumpFalling = false;
 
                 ExtraJump();
-                anim.SetTrigger("Jump");
+                animationController?.PlayJump();
             }
         }
         #endregion
@@ -322,8 +332,19 @@ public class PlayerMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (health != null && health.IsDead)
+        {
+            RB.velocity = Vector2.zero;
+            return;
+        }
+
+        if (forcedHorizontalVelocityTimer > 0f)
+        {
+            RB.velocity = new Vector2(forcedHorizontalVelocity, RB.velocity.y);
+        }
+
         //Handle Run
-        if (!IsDashing)
+        if (!IsDashing && forcedHorizontalVelocityTimer <= 0f)
         {
             if (IsWallJumping)
                 Run(Data.wallJumpRunLerp);
@@ -387,7 +408,7 @@ public class PlayerMovement : MonoBehaviour
     private void Run(float lerpAmount)
     {
         //Calculate the direction we want to move in and our desired velocity
-        float targetSpeed = _moveInput.x * Data.runMaxSpeed;
+        float targetSpeed = _moveInput.x * Data.runMaxSpeed * externalRunMultiplier;
         //We can reduce are control using Lerp() this smooths changes to are direction and speed
         targetSpeed = Mathf.Lerp(RB.velocity.x, targetSpeed, lerpAmount);
 
@@ -593,6 +614,7 @@ public class PlayerMovement : MonoBehaviour
 
         RB.AddForce(movement * Vector2.up);
     }
+
     #endregion
 
 
@@ -666,7 +688,39 @@ public class PlayerMovement : MonoBehaviour
 
     public bool canAttack()
     {
-        return !IsDashing && !IsWallJumping && !IsSliding;
+        return (health == null || !health.IsDead) && !IsDashing && !IsWallJumping && !IsSliding;
+    }
+
+    public void SetExternalRunMultiplier(float multiplier)
+    {
+        externalRunMultiplier = Mathf.Clamp01(multiplier);
+    }
+
+    public void ResetExternalRunMultiplier()
+    {
+        externalRunMultiplier = 1f;
+    }
+
+    public void ForceHorizontalVelocity(float velocity, float duration)
+    {
+        forcedHorizontalVelocity = velocity;
+        forcedHorizontalVelocityTimer = Mathf.Max(0f, duration);
+    }
+
+    public void ClearForcedHorizontalVelocity()
+    {
+        forcedHorizontalVelocity = 0f;
+        forcedHorizontalVelocityTimer = 0f;
+    }
+
+    public bool WasJumpPressedThisFrame()
+    {
+        return Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.J);
+    }
+
+    public bool WasDashPressedThisFrame()
+    {
+        return Input.GetKeyDown(KeyCode.X) || Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.K);
     }
 
     private void LateUpdate()
