@@ -9,6 +9,7 @@ public class EnemyHitReaction : MonoBehaviour
 
     [Header("Hit Control")]
     [SerializeField] private float hitCooldown = 0.2f; // spam engeli
+    [SerializeField] private bool interruptAttackOnHit = false;
 
     private float lastHealth;
     private float nextAllowedTime;
@@ -46,8 +47,8 @@ public class EnemyHitReaction : MonoBehaviour
                 if (hitFlash != null)
                     hitFlash.Play();
 
-                // 🔥 Atak iptali
-                if (flameAI != null)
+                // Optional attack cancel for archetypes that should flinch on hit.
+                if (interruptAttackOnHit && flameAI != null)
                     flameAI.InterruptForHit();
             }
         }

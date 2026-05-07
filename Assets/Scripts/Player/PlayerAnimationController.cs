@@ -125,7 +125,7 @@ public class PlayerAnimationController : MonoBehaviour
 
     public void ReturnToLocomotionState(float transitionDuration = 0.05f)
     {
-        if (!anim)
+        if (!anim || !anim.isActiveAndEnabled || !gameObject.activeInHierarchy)
             return;
 
         string stateName = idleStateName;
@@ -200,7 +200,7 @@ public class PlayerAnimationController : MonoBehaviour
 
     private void CrossFadeLocomotionState(string stateName, float transitionDuration, bool force = false)
     {
-        if (!anim || string.IsNullOrWhiteSpace(stateName))
+        if (!anim || !anim.isActiveAndEnabled || !gameObject.activeInHierarchy || string.IsNullOrWhiteSpace(stateName))
             return;
 
         if (!force && currentLocomotionStateName == stateName)

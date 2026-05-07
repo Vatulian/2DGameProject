@@ -25,7 +25,7 @@ Transform:
   m_GameObject: {fileID: 729625310038435970}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.5, y: -0.56, z: 0}
+  m_LocalPosition: {x: 0.3, y: -0.56, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -90,7 +90,7 @@ Transform:
   m_GameObject: {fileID: 4418149337729776607}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.28, y: -0.55, z: 0}
+  m_LocalPosition: {x: -0.25, y: -0.55, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -127,6 +127,96 @@ Transform:
   m_Children: []
   m_Father: {fileID: 2769589237714901575}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &7009677581947261083
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 7417209060346152800}
+  - component: {fileID: 8657053388909573927}
+  - component: {fileID: 3510924254460975281}
+  m_Layer: 10
+  m_Name: MeleeHitBox
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &7417209060346152800
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7009677581947261083}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 2769589237714901575}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &8657053388909573927
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7009677581947261083}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f31f5e60b49ccdb49825e491a4a74fed, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!61 &3510924254460975281
+BoxCollider2D:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7009677581947261083}
+  m_Enabled: 1
+  m_Density: 1
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_ForceSendLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ForceReceiveLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_ContactCaptureLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_CallbackLayers:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  m_IsTrigger: 1
+  m_UsedByEffector: 0
+  m_UsedByComposite: 0
+  m_Offset: {x: 2, y: -0.5}
+  m_SpriteTilingProperty:
+    border: {x: 0, y: 0, z: 0, w: 0}
+    pivot: {x: 0, y: 0}
+    oldSize: {x: 0, y: 0}
+    newSize: {x: 0, y: 0}
+    adaptiveTilingThreshold: 0
+    drawMode: 0
+    adaptiveTiling: 0
+  m_AutoTiling: 0
+  serializedVersion: 2
+  m_Size: {x: 2.5, y: 1.5}
+  m_EdgeRadius: 0
 --- !u!1 &8068614522105042617
 GameObject:
   m_ObjectHideFlags: 0
@@ -144,6 +234,9 @@ GameObject:
   - component: {fileID: 8244228433799631736}
   - component: {fileID: 4605543683291720943}
   - component: {fileID: 1253428128000431610}
+  - component: {fileID: 6459850797184872740}
+  - component: {fileID: 8823104898141010799}
+  - component: {fileID: 5004280239039847823}
   m_Layer: 10
   m_Name: Player
   m_TagString: Player
@@ -159,13 +252,14 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 8068614522105042617}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -16.5, y: -5.4, z: -2.3525617}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 184749468938867716}
   - {fileID: 9047571901709839924}
+  - {fileID: 7417209060346152800}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!212 &8877109037032674979
@@ -309,13 +403,13 @@ MonoBehaviour:
   _groundCheckSize: {x: 0.49, y: 0.03}
   _frontWallCheckPoint: {fileID: 7910589463389395916}
   _backWallCheckPoint: {fileID: 1620879890563010713}
-  _wallCheckSize: {x: 0.5, y: 1}
+  _wallCheckSize: {x: 0.2, y: 0.5}
   _groundLayer:
     serializedVersion: 2
     m_Bits: 256
   _wallLayer:
     serializedVersion: 2
-    m_Bits: 512
+    m_Bits: 256
 --- !u!114 &1815425971229990616
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -395,6 +489,104 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   checkpoint: {fileID: 8300000, guid: 7512d13d3c05167488e033a081e5879f, type: 3}
+--- !u!114 &6459850797184872740
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8068614522105042617}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 757081aa26537914d8ecf15f193ae501, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  anim: {fileID: 0}
+  rb: {fileID: 0}
+  movement: {fileID: 0}
+  meleeAttack: {fileID: 0}
+  health: {fileID: 0}
+  idleStateName: Swordmaster_Idle
+  runStateName: Swordmaster_Run
+  jumpStateName: Swordmaster_Jump
+  fallStateName: Swordmaster_Fall
+  dashStateName: Swordmaster_Dash
+  wallSlideStateName: Swordmaster_Wall_Slide
+  locomotionTransitionDuration: 0.04
+  runVelocityThreshold: 0.05
+  fallVelocityThreshold: -0.05
+--- !u!114 &8823104898141010799
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8068614522105042617}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4067a717a2859c74b9e1123ddd2cec68, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+--- !u!114 &5004280239039847823
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8068614522105042617}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b770baebadbfd8446b2eeb3eb18844a1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  attackKey: 102
+  phases:
+  - animatorStateName: Swordmaster_Slash_1
+    transitionDuration: 0.005
+    animationSpeed: 2
+    damage: 1
+    hitboxSize: {x: 2.3, y: 1}
+    hitboxOffset: {x: 1.8, y: -0.5}
+    hitboxAnchor: 0
+    hitWindows: []
+    forwardLungeSpeed: 0
+    forwardLungeDuration: 0
+    allowJumpCancel: 1
+    allowDashCancel: 1
+    allowParryCancel: 1
+    attackSound: {fileID: 0}
+  - animatorStateName: Swordmaster_Slash_2
+    transitionDuration: 0.005
+    animationSpeed: 2
+    damage: 1
+    hitboxSize: {x: 2.5, y: 1}
+    hitboxOffset: {x: 2, y: -0.5}
+    hitboxAnchor: 0
+    hitWindows: []
+    forwardLungeSpeed: 4
+    forwardLungeDuration: 0.08
+    allowJumpCancel: 1
+    allowDashCancel: 1
+    allowParryCancel: 1
+    attackSound: {fileID: 0}
+  - animatorStateName: Swordmaster_Spin_Attack
+    transitionDuration: 0.01
+    animationSpeed: 2
+    damage: 1
+    hitboxSize: {x: 2.5, y: 1}
+    hitboxOffset: {x: 2, y: -0.5}
+    hitboxAnchor: 0
+    hitWindows: []
+    forwardLungeSpeed: 6
+    forwardLungeDuration: 0.12
+    allowJumpCancel: 1
+    allowDashCancel: 1
+    allowParryCancel: 1
+    attackSound: {fileID: 0}
+  comboResetDelay: 0.75
+  inputQueueMemory: 0.4
+  meleeHitbox: {fileID: 8657053388909573927}
+  logHitboxEvents: 1
 --- !u!1 &8853005155900271401
 GameObject:
   m_ObjectHideFlags: 0
@@ -420,7 +612,7 @@ Transform:
   m_GameObject: {fileID: 8853005155900271401}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.112, y: -1.173, z: 0}
+  m_LocalPosition: {x: 0.112, y: -1.175, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

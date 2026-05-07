@@ -11,24 +11,22 @@ public class UIManager : MonoBehaviour
     [SerializeField] private AudioClip gameOverSound;
 
     [Header("Level Loading")]
-    [SerializeField] private string firstLevelName = "Level2"; // PlayGame() burayı yükler
+    [SerializeField] private string firstLevelName = "Level2";
 
     [Header("Pause Settings")]
-    [SerializeField] private bool enablePauseInThisScene = true; // MainMenu'de false yapabilirsin
+    [SerializeField] private bool enablePauseInThisScene = true;
 
     [Header("Refs")]
-    [SerializeField] private PlayerRespawn playerRespawn; // opsiyonel
+    [SerializeField] private PlayerRespawn playerRespawn;
 
     private void Awake()
     {
         if (gameOverScreen) gameOverScreen.SetActive(false);
-        if (pauseScreen)    pauseScreen.SetActive(false);
+        if (pauseScreen) pauseScreen.SetActive(false);
 
-        // Oyun sahnesindeysek playerRespawn bul; menüde yoksa null kalır
         if (playerRespawn == null)
             playerRespawn = FindObjectOfType<PlayerRespawn>(includeInactive: true);
 
-        // Sahne değişince pause kalmasın
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
@@ -37,29 +35,24 @@ public class UIManager : MonoBehaviour
         SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
-    private void OnSceneLoaded(Scene s, LoadSceneMode m)
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
-        // Sahne değişince her ihtimale karşı zaman akışını normalle
         Time.timeScale = 1f;
 
-        // Yeni sahnede PlayerRespawn yeniden bulunabilir
         if (playerRespawn == null)
             playerRespawn = FindObjectOfType<PlayerRespawn>(includeInactive: true);
 
-        // Ekranlar reset
         if (gameOverScreen) gameOverScreen.SetActive(false);
-        if (pauseScreen)    pauseScreen.SetActive(false);
+        if (pauseScreen) pauseScreen.SetActive(false);
     }
 
     private void Update()
     {
-        if (!enablePauseInThisScene) return; // menü sahnesinde pause devre dışı
+        if (!enablePauseInThisScene)
+            return;
 
         if (Input.GetKeyDown(KeyCode.Escape) && pauseScreen != null)
-        {
-            // Açık ise kapat, kapalı ise aç
             PauseGame(!pauseScreen.activeInHierarchy);
-        }
     }
 
     #region Game Over
@@ -69,41 +62,26 @@ public class UIManager : MonoBehaviour
         if (SoundManager.instance != null && gameOverSound != null)
             SoundManager.instance.PlaySound(gameOverSound);
 
-        // İstersen burada oyunu dondurabilirsin:
         Time.timeScale = 0f;
     }
 
     public void Restart()
     {
         if (gameOverScreen) gameOverScreen.SetActive(false);
-        
-        Time.timeScale = 1f;  // Oyunu tekrar akışa sok
+        if (pauseScreen) pauseScreen.SetActive(false);
+        Time.timeScale = 1f;
 
         if (playerRespawn != null)
         {
             playerRespawn.RestartFromCheckpoint();
-        }
-        else
-        {
-            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            return;
         }
 
-        if (playerRespawn != null)
-        {
-            // Checkpoint'ten devam
-            playerRespawn.RestartFromCheckpoint();
-            // Time.timeScale = 1f; // respawn içinde yönetiyorsan gerek yok
-        }
-        else
-        {
-            // Yedek: sahneyi baştan yükle (aktif sahne)
-            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-        }
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 
     public void MainMenu()
     {
-        // Build Settings'te 0. index menü ise:
         SceneManager.LoadScene(0);
     }
     #endregion
@@ -131,13 +109,12 @@ public class UIManager : MonoBehaviour
     #endregion
 
     #region Scene Loading
-    // Menülerde kullanmak için net bir Play tuşu:
     public void PlayGame()
     {
         if (!string.IsNullOrEmpty(firstLevelName))
             SceneManager.LoadScene(firstLevelName);
         else
-            Debug.LogWarning("[UIManager] firstLevelName boş, Level1 ismiyle eşle!");
+            Debug.LogWarning("[UIManager] firstLevelName is empty.");
     }
 
     public void LoadLevel(string sceneName)
@@ -145,7 +122,7 @@ public class UIManager : MonoBehaviour
         if (!string.IsNullOrEmpty(sceneName))
             SceneManager.LoadScene(sceneName);
         else
-            Debug.LogWarning("[UIManager] LoadLevel: Geçersiz sahne adı.");
+            Debug.LogWarning("[UIManager] LoadLevel received an invalid scene name.");
     }
 
     public void LoadLevelByIndex(int buildIndex)
@@ -153,7 +130,7 @@ public class UIManager : MonoBehaviour
         if (buildIndex >= 0 && buildIndex < SceneManager.sceneCountInBuildSettings)
             SceneManager.LoadScene(buildIndex);
         else
-            Debug.LogWarning("[UIManager] LoadLevelByIndex: Geçersiz index.");
+            Debug.LogWarning("[UIManager] LoadLevelByIndex received an invalid build index.");
     }
 
     public void Quit()

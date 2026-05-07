@@ -6,11 +6,17 @@ public class PlayerRespawn : MonoBehaviour
     [SerializeField] private AudioClip checkpoint;
     private Transform currentCheckpoint;
     private Health playerHealth;
+    private Rigidbody2D rb;
+    private SpriteRenderer spriteRenderer;
+    private Animator anim;
     private UIManager uiManager;
 
     private void Awake()
     {
         playerHealth = GetComponent<Health>();
+        rb = GetComponent<Rigidbody2D>();
+        spriteRenderer = GetComponent<SpriteRenderer>();
+        anim = GetComponent<Animator>();
         uiManager = FindAnyObjectByType<UIManager>();
     }
 
@@ -24,8 +30,14 @@ public class PlayerRespawn : MonoBehaviour
     {
         if (currentCheckpoint != null)
         {
-            playerHealth.Respawn();
             transform.position = currentCheckpoint.position;
+            if (rb != null)
+            {
+                rb.position = currentCheckpoint.position;
+                rb.velocity = Vector2.zero;
+                rb.angularVelocity = 0f;
+            }
+            playerHealth.Respawn();
 
             // Boss ölmediyse boss fight state'ini resetle (kamera/duvar/kapı/boss/ui)
             Boss boss = FindObjectOfType<Boss>(true);
@@ -37,6 +49,16 @@ public class PlayerRespawn : MonoBehaviour
         }
         else
         {
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+                rb.angularVelocity = 0f;
+            }
+            if (anim != null)
+                anim.enabled = false;
+            if (spriteRenderer != null)
+                spriteRenderer.enabled = false;
+
             Debug.LogWarning("No checkpoint available! Restarting from the beginning.");
             SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
         }

@@ -3,12 +3,17 @@ using System.Collections;
 
 public class Health : MonoBehaviour
 {
+    private const int PlayerLayer = 10;
+    private const int EnemyLayer = 11;
+
     [Header("Health")]
     [SerializeField] private float startingHealth;
     public float currentHealth { get; private set; }
     private Animator anim;
     private PlayerAnimationController playerAnimationController;
     private PlayerMeleeAttack playerMeleeAttack;
+    private PlayerRespawn playerRespawn;
+    private Rigidbody2D rb;
     private bool dead;
     public bool IsDead => dead;
 
@@ -22,12 +27,15 @@ public class Health : MonoBehaviour
     [Header("Components")]
     [SerializeField] private Behaviour[] components;
     private bool invulnerable;
+    private int enemyCollisionIgnoreRequests;
 
     [Header("Death Sound")]
     [SerializeField] private AudioClip deathSound;
     [SerializeField] private AudioClip hurtSound;
 
-    
+    private string originalTag;
+    private int originalLayer;
+
     public bool IsInvulnerable => invulnerable;
 
     private void Awake()
@@ -37,7 +45,11 @@ public class Health : MonoBehaviour
         anim = GetComponent<Animator>();
         playerAnimationController = GetComponent<PlayerAnimationController>();
         playerMeleeAttack = GetComponent<PlayerMeleeAttack>();
+        playerRespawn = GetComponent<PlayerRespawn>();
         spriteRend = GetComponent<SpriteRenderer>();
+        rb = GetComponent<Rigidbody2D>();
+        originalTag = gameObject.tag;
+        originalLayer = gameObject.layer;
     }
 
     public void TakeDamage(float _damage)
@@ -65,9 +77,15 @@ public class Health : MonoBehaviour
             {
                 dead = true;
                 StopAllCoroutines();
-                Physics2D.IgnoreLayerCollision(10, 11, false);
+                enemyCollisionIgnoreRequests = 0;
+                ApplyPlayerEnemyCollisionIgnore();
                 invulnerable = false;
                 playerMeleeAttack?.ResetCombo(false);
+                if (playerRespawn != null)
+                {
+                    gameObject.tag = "Untagged";
+                    gameObject.layer = 0;
+                }
 
                 if (playerAnimationController != null) playerAnimationController.PlayDeath();
                 else if (anim != null)
@@ -94,7 +112,7 @@ public class Health : MonoBehaviour
     private IEnumerator Invunerability()
     {
         invulnerable = true;
-        Physics2D.IgnoreLayerCollision(10, 11, true);
+        SetEnemyCollisionIgnored(true);
         for (int i = 0; i < numberOfFlashes; i++)
         {
             spriteRend.color = new Color(1, 0, 0, 0.5f);
@@ -102,7 +120,7 @@ public class Health : MonoBehaviour
             spriteRend.color = Color.white;
             yield return new WaitForSeconds(iFramesDuration / (numberOfFlashes * 2));
         }
-        Physics2D.IgnoreLayerCollision(10, 11, false);
+        SetEnemyCollisionIgnored(false);
         invulnerable = false;
     }
 
@@ -122,10 +140,27 @@ public class Health : MonoBehaviour
             playerAnimationController = GetComponent<PlayerAnimationController>();
         if (playerMeleeAttack == null)
             playerMeleeAttack = GetComponent<PlayerMeleeAttack>();
+        if (rb == null)
+            rb = GetComponent<Rigidbody2D>();
 
+        StopAllCoroutines();
         dead = false;
+        invulnerable = false;
         currentHealth = checkpointHealth;
-        Physics2D.IgnoreLayerCollision(10, 11, false);
+        if (playerRespawn != null)
+        {
+            gameObject.tag = originalTag;
+            gameObject.layer = originalLayer;
+        }
+        enemyCollisionIgnoreRequests = 0;
+        ApplyPlayerEnemyCollisionIgnore();
+        if (spriteRend != null)
+            spriteRend.color = Color.white;
+        if (rb != null)
+        {
+            rb.velocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+        }
         playerMeleeAttack?.ResetCombo(false);
         if (playerAnimationController != null) playerAnimationController.PlayRespawn();
         else if (anim != null)
@@ -150,5 +185,19 @@ public class Health : MonoBehaviour
     }
 
     public bool Invulnerable => invulnerable;
+
+    public void SetEnemyCollisionIgnored(bool ignored)
+    {
+        enemyCollisionIgnoreRequests += ignored ? 1 : -1;
+        if (enemyCollisionIgnoreRequests < 0)
+            enemyCollisionIgnoreRequests = 0;
+
+        ApplyPlayerEnemyCollisionIgnore();
+    }
+
+    private void ApplyPlayerEnemyCollisionIgnore()
+    {
+        Physics2D.IgnoreLayerCollision(PlayerLayer, EnemyLayer, enemyCollisionIgnoreRequests > 0);
+    }
 
 }

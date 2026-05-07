@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class FlameEnemyAI : MonoBehaviour
 {
-    private enum State { Patrol, WaitAtEnd, Prep, Flame }
+    private enum State { Patrol, WaitAtEnd, Prep, Flame, Recovery }
 
     [Header("Refs")]
     [SerializeField] private Transform sprite;           // Animator+Renderer child
@@ -33,6 +33,7 @@ public class FlameEnemyAI : MonoBehaviour
     [SerializeField] private float prepTime = 0.5f;
     [SerializeField] private float flameDuration = 1.2f;
     [SerializeField] private float damageInterval = 0.25f;
+    [SerializeField] private float recoveryTime = 1.1f;
     [SerializeField] private int damage = 1;
 
     [Tooltip("If true, once Prep starts the enemy will flame even if the player leaves the cone.")]
@@ -41,6 +42,10 @@ public class FlameEnemyAI : MonoBehaviour
     [Header("Attack Facing")]
     [Tooltip("If true, once Prep starts the enemy will NOT turn until Flame ends.")]
     [SerializeField] private bool lockFacingDuringAttack = true;
+
+    [Header("Spacing")]
+    [SerializeField] private float retreatDistance = 1.15f;
+    [SerializeField] private float retreatSpeed = 1.5f;
 
     private Rigidbody2D rb;
     private Transform player;
@@ -104,6 +109,7 @@ public class FlameEnemyAI : MonoBehaviour
             case State.WaitAtEnd: TickWait();   break;
             case State.Prep:      TickPrep();   break;
             case State.Flame:     TickFlame();  break;
+            case State.Recovery:  TickRecovery(); break;
         }
     }
 
@@ -233,9 +239,8 @@ public class FlameEnemyAI : MonoBehaviour
         if (timer <= 0f)
         {
             if (flameArea) flameArea.enabled = false;
-
-            // Attack ended; after this, patrol logic will manage direction again
-            state = State.Patrol;
+            state = State.Recovery;
+            timer = recoveryTime;
             return;
         }
 
@@ -256,6 +261,32 @@ public class FlameEnemyAI : MonoBehaviour
             if (hit != null && hit.CompareTag("Player"))
                 playerHealth.TakeDamage(damage);
         }
+    }
+
+    private void TickRecovery()
+    {
+        rb.velocity = new Vector2(0f, rb.velocity.y);
+
+        if (player != null)
+        {
+            float distanceToPlayer = Mathf.Abs(player.position.x - transform.position.x);
+            if (distanceToPlayer < retreatDistance)
+            {
+                int retreatDir = player.position.x >= transform.position.x ? -1 : 1;
+                float minX = Mathf.Min(leftPoint.position.x, rightPoint.position.x);
+                float maxX = Mathf.Max(leftPoint.position.x, rightPoint.position.x);
+                float nextX = Mathf.Clamp(transform.position.x + retreatDir * retreatSpeed * Time.deltaTime, minX, maxX);
+                transform.position = new Vector3(nextX, transform.position.y, transform.position.z);
+                dir = retreatDir;
+                ApplyFacing();
+            }
+        }
+
+        PlayOnce("idle");
+
+        timer -= Time.deltaTime;
+        if (timer <= 0f)
+            state = State.Patrol;
     }
 
     // ---------------- Detection: ONE cone with independent upper/lower angles around horizontal baseline

@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>FlameGuy Combat Report</title>
+  <style>
+    :root {
+      --bg: #f6f0e7;
+      --paper: #fffdf8;
+      --ink: #1e1d1a;
+      --muted: #5b564d;
+      --accent: #8a4b2a;
+      --line: #d7cfc2;
+    }
+
+    @page {
+      size: A4;
+      margin: 18mm;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.5;
+    }
+
+    .page {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 40px 48px 56px;
+      background: var(--paper);
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+      color: var(--accent);
+    }
+
+    h2 {
+      font-size: 20px;
+      margin-top: 28px;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h3 {
+      font-size: 16px;
+      margin-top: 18px;
+      margin-bottom: 8px;
+    }
+
+    p {
+      margin: 0 0 10px;
+      font-size: 14px;
+    }
+
+    ul, ol {
+      margin: 0 0 12px 20px;
+      padding: 0;
+      font-size: 14px;
+    }
+
+    li {
+      margin: 0 0 6px;
+    }
+
+    .lede {
+      color: var(--muted);
+      font-size: 15px;
+      margin-bottom: 22px;
+    }
+
+    .meta {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .callout {
+      margin: 14px 0 18px;
+      padding: 12px 14px;
+      border-left: 4px solid var(--accent);
+      background: #f6ede5;
+    }
+
+    .small {
+      font-size: 13px;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <h1>FlameGuy Combat Report</h1>
+    <p class="lede">
+      This report combines your gameplay observations from <em>Prince of Persia: The Lost Crown</em> and <em>Dead Cells</em>
+      with design conclusions for the current Unity project, with a specific focus on FlameGuy.
+    </p>
+    <p class="meta">Project: 2DGame<br>Date: 2026-05-07</p>
+
+    <h2>Executive Summary</h2>
+    <p>
+      The strongest shared takeaway from both reference games is that enemies do not behave like raw physics objects.
+      They behave like combat actors. Positioning, spacing, pushback, cooldowns, and retreat behavior are deliberately authored.
+      Normal contact is tightly controlled, while combat displacement is intentional and readable.
+    </p>
+    <div class="callout">
+      <p>
+        Core conclusion: FlameGuy should be designed as a <strong>combat actor</strong>, not as a regular dynamic rigidbody enemy
+        that passively accepts player push forces.
+      </p>
+    </div>
+
+    <h2>Observed Reference Behaviors</h2>
+
+    <h3>Prince of Persia: The Lost Crown</h3>
+    <ul>
+      <li>Enemies do not visibly slide around from simple body contact.</li>
+      <li>Some enemies create space after attacks. Sometimes the player is displaced, sometimes the enemy steps back.</li>
+      <li>Enemy attack archetypes vary: charge attacks, distance-closing runs, dashes, and standard strikes.</li>
+      <li>When the player runs directly into an enemy, the enemy often gives ground slowly to preserve spacing.</li>
+      <li>There are clear attack cooldowns, often around one to two seconds between actions.</li>
+      <li>Some enemies have combo attack chains.</li>
+      <li>Charge attacks are designed to be answered with systems like parry or dash.</li>
+      <li>Player melee attacks include forward lunges and controlled pushback that preserve combat readability.</li>
+    </ul>
+
+    <h3>Dead Cells</h3>
+    <ul>
+      <li>Player and enemy collision is not treated like persistent body-blocking.</li>
+      <li>During enemy attack phases, collision feels even more relaxed or disabled.</li>
+      <li>Enemies generally do not fall off platforms under normal combat pressure.</li>
+      <li>Knockback exists as a combat reaction, but platform-fall knockback effectively acts like a lethal outcome.</li>
+      <li>Attacks still include forward lunges.</li>
+      <li>Combo chains are shorter, but the timing between attacks is very deliberate.</li>
+    </ul>
+
+    <h2>Shared Design Pattern</h2>
+    <p>
+      Although the two games feel different, they share the same structural logic:
+    </p>
+    <ol>
+      <li>Normal body push is weak or absent.</li>
+      <li>Combat displacement is strong, but only when intentionally triggered.</li>
+      <li>Enemy spacing is authored, not left to the physics solver.</li>
+      <li>Platform ownership is stable. Enemies do not casually drift off ledges.</li>
+      <li>Cooldowns and recovery windows shape the combat rhythm.</li>
+      <li>Enemy movement is state-driven rather than force-driven.</li>
+    </ol>
+
+    <h2>Implications for This Project</h2>
+    <p>
+      The current Unity setup has several archetypes that were built at different times and therefore follow different combat rules.
+      Your observations now give us a clearer standard to converge toward.
+    </p>
+    <ul>
+      <li>Enemies should not be freely pushed by the player during normal contact.</li>
+      <li>If spacing changes, that should happen because of an attack, recoil, retreat, dash, or a dedicated reposition rule.</li>
+      <li>Platform loss should be a special-case behavior, not an accidental byproduct of physics.</li>
+      <li>Basic melee pressure should preserve readable distance instead of collapsing characters into each other.</li>
+    </ul>
+
+    <h2>FlameGuy Role Assessment</h2>
+    <p>
+      FlameGuy is a low-mobility zone-control enemy. That makes it a strong candidate for a more authored movement model than a pure
+      dynamic rigidbody combatant. Its identity benefits from holding position, owning space, and punishing the player with a flame lane,
+      rather than being shoved around during close contact.
+    </p>
+    <ul>
+      <li>FlameGuy should feel grounded and stubborn.</li>
+      <li>FlameGuy should keep pressure through attack commitment.</li>
+      <li>FlameGuy should not be casually displaced by the player’s body.</li>
+      <li>FlameGuy should preserve the platform or lane it was designed to control.</li>
+    </ul>
+
+    <h2>Recommended Technical Direction for FlameGuy</h2>
+    <p>
+      The long-term direction should be to treat FlameGuy as a rule-driven combat actor with explicit spacing and platform ownership.
+    </p>
+
+    <h3>1. Movement Model</h3>
+    <ul>
+      <li>Prefer an authored movement model over passive force-based reactions.</li>
+      <li>Normal position updates should come from AI state logic, not from player push forces.</li>
+      <li>If a kinematic approach is adopted later, movement should be driven through controlled patrol and reposition rules.</li>
+    </ul>
+
+    <h3>2. Platform Ownership</h3>
+    <ul>
+      <li>FlameGuy should not casually fall from its patrol lane.</li>
+      <li>`leftPoint` and `rightPoint` already provide a strong base for lane ownership.</li>
+      <li>If needed, an additional ground-ahead check can stop it from moving off ledges.</li>
+    </ul>
+
+    <h3>3. Combat Spacing</h3>
+    <ul>
+      <li>Add a preferred combat distance.</li>
+      <li>Add a minimum distance threshold for pressure response.</li>
+      <li>If the player enters too deeply, FlameGuy should use a short retreat or spacing correction rather than raw physics drift.</li>
+    </ul>
+
+    <h3>4. Attack Loop</h3>
+    <ul>
+      <li>Patrol</li>
+      <li>Prep</li>
+      <li>Flame</li>
+      <li>Recovery / Cooldown</li>
+      <li>Optional short retreat before re-entering patrol or idle combat watch</li>
+    </ul>
+
+    <h3>5. Hit Reaction Policy</h3>
+    <ul>
+      <li>FlameGuy should keep its attack commitment when hit, according to your latest direction.</li>
+      <li>Visual feedback such as hit flash can remain.</li>
+      <li>If a reaction is added later, it should be small and should not invalidate the flame attack identity.</li>
+    </ul>
+
+    <h2>FlameGuy Behavior Spec</h2>
+
+    <h3>Patrol</h3>
+    <ul>
+      <li>Moves between two points.</li>
+      <li>Does not leave its intended platform.</li>
+      <li>Transitions into prep when the player enters its cone and range conditions are met.</li>
+    </ul>
+
+    <h3>Prep</h3>
+    <ul>
+      <li>Stops and faces the player.</li>
+      <li>Maintains composure under pressure.</li>
+      <li>Does not cancel attack commitment when hit.</li>
+    </ul>
+
+    <h3>Flame</h3>
+    <ul>
+      <li>Holds its lane while executing the flame attack.</li>
+      <li>Uses the flame area as its authored damage channel.</li>
+      <li>Does not get body-pushed during the attack phase.</li>
+    </ul>
+
+    <h3>Recovery</h3>
+    <ul>
+      <li>After the flame ends, a cooldown prevents immediate repetition.</li>
+      <li>A short retreat may be added to restore spacing if the player is too close.</li>
+    </ul>
+
+    <h2>Why Mass Alone Is Not Enough</h2>
+    <p>
+      Increasing rigidbody mass can reduce push, but it does not solve the design problem. As long as the player and FlameGuy still interact
+      through a normal dynamic rigidbody contact model, the player can continue to influence it in ways that do not match the reference games.
+    </p>
+    <ul>
+      <li>Mass tuning may reduce displacement but will not fully eliminate it.</li>
+      <li>Mass tuning can make future knockback balancing harder.</li>
+      <li>Mass does not introduce authored spacing or retreat behavior.</li>
+    </ul>
+
+    <h2>Current Best Direction</h2>
+    <p>
+      Based on your reference notes, the project should move away from “heavy physics enemy” thinking and toward “authored combat actor” thinking.
+      FlameGuy is the best first archetype for that shift because it naturally benefits from stable platform ownership and intentional spacing control.
+    </p>
+
+    <h2>Suggested Next Steps</h2>
+    <ol>
+      <li>Define a FlameGuy spacing policy: preferred distance, minimum distance, retreat duration, and cooldown duration.</li>
+      <li>Decide whether FlameGuy should become fully kinematic or keep a hybrid movement model with platform ownership rules.</li>
+      <li>Implement a post-attack recovery window.</li>
+      <li>Implement pressure response that preserves spacing without raw body push.</li>
+      <li>Apply the resulting combat standard later to MeleeEnemy and other grounded archetypes.</li>
+    </ol>
+
+    <p class="small">
+      Prepared from your gameplay observations and translated into project-facing combat design recommendations for the current Unity codebase.
+    </p>
+  </main>
+</body>
+</html>

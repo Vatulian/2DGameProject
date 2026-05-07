@@ -546,6 +546,7 @@ public class PlayerMovement : MonoBehaviour
 
         _dashesLeft--;
         _isDashAttacking = true;
+        health?.SetEnemyCollisionIgnored(true);
 
         SetGravityScale(0);
 
@@ -572,6 +573,7 @@ public class PlayerMovement : MonoBehaviour
         }
 
         //Dash over
+        health?.SetEnemyCollisionIgnored(false);
         IsDashing = false;
     }
 
