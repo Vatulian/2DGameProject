@@ -1,5 +1,6 @@
-using UnityEngine;
+using System;
 using System.Collections;
+using UnityEngine;
 
 public class Health : MonoBehaviour
 {
@@ -9,12 +10,11 @@ public class Health : MonoBehaviour
     [Header("Health")]
     [SerializeField] private float startingHealth;
     public float currentHealth { get; private set; }
+    public float CurrentHealth => currentHealth;
     private Animator anim;
-    private PlayerAnimationController playerAnimationController;
-    private PlayerMeleeAttack playerMeleeAttack;
-    private PlayerRespawn playerRespawn;
     private Rigidbody2D rb;
     private bool dead;
+    private bool isPlayerCharacter;
     public bool IsDead => dead;
 
     private float checkpointHealth;
@@ -36,6 +36,10 @@ public class Health : MonoBehaviour
     private string originalTag;
     private int originalLayer;
 
+    public event Action<float> OnDamaged;
+    public event Action OnDeath;
+    public event Action OnRespawned;
+
     public bool IsInvulnerable => invulnerable;
 
     private void Awake()
@@ -43,30 +47,23 @@ public class Health : MonoBehaviour
         currentHealth = startingHealth;
         checkpointHealth = currentHealth;
         anim = GetComponent<Animator>();
-        playerAnimationController = GetComponent<PlayerAnimationController>();
-        playerMeleeAttack = GetComponent<PlayerMeleeAttack>();
-        playerRespawn = GetComponent<PlayerRespawn>();
         spriteRend = GetComponent<SpriteRenderer>();
         rb = GetComponent<Rigidbody2D>();
+        isPlayerCharacter = GetComponent<PlayerRespawn>() != null;
         originalTag = gameObject.tag;
         originalLayer = gameObject.layer;
     }
 
     public void TakeDamage(float _damage)
     {
-        if (playerAnimationController == null)
-            playerAnimationController = GetComponent<PlayerAnimationController>();
-        if (playerMeleeAttack == null)
-            playerMeleeAttack = GetComponent<PlayerMeleeAttack>();
-
         if (invulnerable || dead) return;
         currentHealth = Mathf.Clamp(currentHealth - _damage, 0, startingHealth);
+        OnDamaged?.Invoke(currentHealth);
 
         if (currentHealth > 0)
         {
-            playerMeleeAttack?.ResetCombo();
-            if (playerAnimationController != null) playerAnimationController.PlayHurt();
-            else if (anim != null) anim.SetTrigger("Hurt");
+            if (OnDamaged == null && anim != null)
+                anim.SetTrigger("Hurt");
             StartCoroutine(Invunerability());
             if (hurtSound != null)
                 SoundManager.instance.PlaySound(hurtSound);
@@ -80,14 +77,16 @@ public class Health : MonoBehaviour
                 enemyCollisionIgnoreRequests = 0;
                 ApplyPlayerEnemyCollisionIgnore();
                 invulnerable = false;
-                playerMeleeAttack?.ResetCombo(false);
-                if (playerRespawn != null)
+                if (isPlayerCharacter)
                 {
                     gameObject.tag = "Untagged";
                     gameObject.layer = 0;
                 }
 
-                if (playerAnimationController != null) playerAnimationController.PlayDeath();
+                if (OnDeath != null)
+                {
+                    OnDeath.Invoke();
+                }
                 else if (anim != null)
                 {
                     anim.SetBool("Grounded", true);
@@ -136,10 +135,6 @@ public class Health : MonoBehaviour
 
     public void Respawn()
     {
-        if (playerAnimationController == null)
-            playerAnimationController = GetComponent<PlayerAnimationController>();
-        if (playerMeleeAttack == null)
-            playerMeleeAttack = GetComponent<PlayerMeleeAttack>();
         if (rb == null)
             rb = GetComponent<Rigidbody2D>();
 
@@ -147,7 +142,7 @@ public class Health : MonoBehaviour
         dead = false;
         invulnerable = false;
         currentHealth = checkpointHealth;
-        if (playerRespawn != null)
+        if (isPlayerCharacter)
         {
             gameObject.tag = originalTag;
             gameObject.layer = originalLayer;
@@ -161,8 +156,11 @@ public class Health : MonoBehaviour
             rb.velocity = Vector2.zero;
             rb.angularVelocity = 0f;
         }
-        playerMeleeAttack?.ResetCombo(false);
-        if (playerAnimationController != null) playerAnimationController.PlayRespawn();
+
+        if (OnRespawned != null)
+        {
+            OnRespawned.Invoke();
+        }
         else if (anim != null)
         {
             anim.ResetTrigger("Die");
@@ -180,7 +178,6 @@ public class Health : MonoBehaviour
         return component != null
                && component != this
                && component != anim
-               && component != playerAnimationController
                && component is not PlayerRespawn;
     }
 

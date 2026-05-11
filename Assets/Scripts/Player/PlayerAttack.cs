@@ -3,6 +3,7 @@ using UnityEngine;
 public class PlayerAttack : MonoBehaviour
 {
     [SerializeField] private float attackCooldown = 0.25f;
+    [SerializeField] private float attackLockDuration = 0.2f;
     [SerializeField] private Transform firePoint;
     [SerializeField] private GameObject[] fireballs;
     [SerializeField] private AudioClip fireballSound;
@@ -10,26 +11,38 @@ public class PlayerAttack : MonoBehaviour
     private PlayerAnimationController animationController;
     private Animator anim;
     private PlayerMovement playerMovement;
+    private PlayerMeleeAttack meleeAttack;
     private Health health;
     private float cooldownTimer = 0f;
+    private float attackLockTimer = 0f;
+
+    public bool IsAttacking => attackLockTimer > 0f;
 
     private void Awake()
     {
         animationController = GetComponent<PlayerAnimationController>();
         anim = GetComponent<Animator>();
         playerMovement = GetComponent<PlayerMovement>();
+        meleeAttack = GetComponent<PlayerMeleeAttack>();
         health = GetComponent<Health>();
     }
 
     private void Update()
     {
         cooldownTimer -= Time.deltaTime;
+        attackLockTimer -= Time.deltaTime;
 
         if (health != null && health.IsDead)
             return;
 
-        if (Input.GetMouseButtonDown(0) && cooldownTimer <= 0f && playerMovement != null && playerMovement.canAttack())
+        if (Input.GetMouseButtonDown(0)
+            && cooldownTimer <= 0f
+            && playerMovement != null
+            && playerMovement.canAttack()
+            && (meleeAttack == null || !meleeAttack.IsAttacking))
+        {
             FireOnce();
+        }
     }
 
     private void FireOnce()
@@ -42,6 +55,7 @@ public class PlayerAttack : MonoBehaviour
             return;
 
         cooldownTimer = attackCooldown;
+        attackLockTimer = Mathf.Max(attackLockDuration, attackCooldown * 0.5f);
 
         if (animationController != null) animationController.PlayAttack();
         else if (anim != null) anim.SetTrigger("Attack");

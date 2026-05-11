@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 
 public class MeleeEnemy : MonoBehaviour
@@ -37,11 +36,13 @@ public class MeleeEnemy : MonoBehaviour
     {
         anim = GetComponent<Animator>();
         enemyPatrol = GetComponentInParent<EnemyPatrol>();
-        player = GameObject.FindGameObjectWithTag("Player").transform; 
     }
 
     private void Update()
     {
+        if (!TryResolvePlayer())
+            return;
+
         cooldownTimer += Time.deltaTime;
 
         if (isChasing)
@@ -185,5 +186,23 @@ public class MeleeEnemy : MonoBehaviour
         {
             anim.SetBool("Idle", true); // after attacking, stance "idle"
         }
+    }
+
+    private bool TryResolvePlayer()
+    {
+        if (!PlayerReference.IsAvailable)
+        {
+            player = null;
+            playerHealth = null;
+            return false;
+        }
+
+        if (player != PlayerReference.Player)
+        {
+            player = PlayerReference.Player;
+            playerHealth = PlayerReference.Health;
+        }
+
+        return player != null && playerHealth != null;
     }
 }

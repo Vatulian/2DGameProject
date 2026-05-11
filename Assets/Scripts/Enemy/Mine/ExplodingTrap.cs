@@ -4,8 +4,8 @@ public class ExplodingTrap : MonoBehaviour
 {
     public enum TrapMode
     {
-        Homing,          // Görünce seni kovalar
-        DropAlongSight   // Görünce, o anki doğrultuda bir yere çarpana kadar gider
+        Homing,
+        DropAlongSight
     }
 
     private enum State
@@ -20,52 +20,46 @@ public class ExplodingTrap : MonoBehaviour
     [SerializeField] private TrapMode mode = TrapMode.Homing;
 
     [Header("Refs")]
-    [SerializeField] private Transform model;            // Sprite/anim child (sadece görsel için)
-    [SerializeField] private Transform visionOrigin;     // FOV için başlangıç noktası (yoksa kendi pozisyonunu kullanır)
+    [SerializeField] private Transform model;
+    [SerializeField] private Transform visionOrigin;
 
     [Header("Animation")]
-    [SerializeField] private Animator animator;          
+    [SerializeField] private Animator animator;
     [SerializeField] private string explodeTriggerName = "Explode";
     [SerializeField] private float destroyDelayAfterExplosion = 0.5f;
 
     [Header("Detection (FOV)")]
     [SerializeField] private float viewDistance = 8f;
-    [Tooltip("İleri yönün sol tarafına doğru maksimum açı (pozitif, derece)")]
     [SerializeField] private float viewAngleLeft = 45f;
-    [Tooltip("İleri yönün sağ tarafına doğru maksimum açı (pozitif, derece)")]
     [SerializeField] private float viewAngleRight = 45f;
-    [SerializeField] private LayerMask playerLayer;             
-    [SerializeField] private LayerMask obstructionLayers;       
+    [SerializeField] private LayerMask playerLayer;
+    [SerializeField] private LayerMask obstructionLayers;
 
     [Header("FOV Orientation")]
-    [Tooltip("FOV konisinin merkez yönü. Örn: (1,0)=sağ, (-1,0)=sol, (0,1)=yukarı, (0,-1)=aşağı")]
     [SerializeField] private Vector2 forwardDirection = Vector2.right;
 
     [Header("Timing")]
-    [SerializeField] private float windupTime = 0.4f;           
-    [SerializeField] private float activeDuration = 1.5f;       
+    [SerializeField] private float windupTime = 0.4f;
+    [SerializeField] private float activeDuration = 1.5f;
 
     [Header("Movement")]
-    [SerializeField] private float homingSpeed = 8f;            
-    [SerializeField] private float dropSpeed = 12f;             
+    [SerializeField] private float homingSpeed = 8f;
+    [SerializeField] private float dropSpeed = 12f;
 
     [Header("Explosion")]
     [SerializeField] private float explosionRadius = 1.2f;
     [SerializeField] private int damage = 1;
-    [SerializeField] private GameObject explosionPrefab;        
-    [SerializeField] private AudioClip explosionSfx;            
+    [SerializeField] private GameObject explosionPrefab;
+    [SerializeField] private AudioClip explosionSfx;
 
     [Header("Collision")]
-    [SerializeField] private LayerMask explodeOnCollisionLayers; 
+    [SerializeField] private LayerMask explodeOnCollisionLayers;
 
     private State state = State.Idle;
     private float stateTimer;
-
     private Rigidbody2D rb;
     private Transform player;
-    private bool hasExploded = false;
-
-    // Yeni: DropAlongSight için, gördüğü andaki yön
+    private bool hasExploded;
     private Vector2 dropDirection;
 
     private void Awake()
@@ -87,14 +81,14 @@ public class ExplodingTrap : MonoBehaviour
             else
                 animator = GetComponent<Animator>();
         }
-
-        GameObject p = GameObject.FindGameObjectWithTag("Player");
-        if (p != null) player = p.transform;
     }
 
     private void Update()
     {
-        if (state == State.Exploded) return;
+        TryResolvePlayer();
+
+        if (state == State.Exploded)
+            return;
 
         switch (state)
         {
@@ -102,44 +96,39 @@ public class ExplodingTrap : MonoBehaviour
                 if (CanSeePlayer())
                     StartWindup();
                 break;
-
             case State.Windup:
                 HandleWindup();
                 break;
-
             case State.Active:
                 HandleActive();
                 break;
         }
     }
 
-    #region State Logic
-
     private void StartWindup()
     {
-        if (player == null) return;
+        if (player == null)
+            return;
 
-        // DropAlongSight: beni gördüğü anda doğrultuyu kaydet
         if (mode == TrapMode.DropAlongSight)
         {
-            Vector2 toPlayer = (player.position - transform.position);
-            if (toPlayer.sqrMagnitude > 0.0001f)
-                dropDirection = toPlayer.normalized;
-            else
-                dropDirection = GetForward(); // fallback
+            Vector2 toPlayer = player.position - transform.position;
+            dropDirection = toPlayer.sqrMagnitude > 0.0001f ? toPlayer.normalized : GetForward();
         }
 
         state = State.Windup;
         stateTimer = windupTime;
 
-        if (rb != null) rb.velocity = Vector2.zero;
+        if (rb != null)
+            rb.velocity = Vector2.zero;
     }
 
     private void HandleWindup()
     {
         stateTimer -= Time.deltaTime;
 
-        if (rb != null) rb.velocity = Vector2.zero;
+        if (rb != null)
+            rb.velocity = Vector2.zero;
 
         if (stateTimer <= 0f)
         {
@@ -160,25 +149,17 @@ public class ExplodingTrap : MonoBehaviour
                 Move(dir, homingSpeed);
             }
         }
-        else // DropAlongSight
+        else
         {
             if (dropDirection.sqrMagnitude < 0.0001f)
-                dropDirection = GetForward(); // güvenlik
+                dropDirection = GetForward();
 
             Move(dropDirection, dropSpeed);
-            // Çarpınca patlamayı OnCollisionEnter2D hallediyor
         }
 
-        // Failsafe: hiç bir yere çarpmazsa süre bitince patla
         if (stateTimer <= 0f)
-        {
             Explode();
-        }
     }
-
-    #endregion
-
-    #region Movement helpers
 
     private void Move(Vector2 dir, float speed)
     {
@@ -192,30 +173,24 @@ public class ExplodingTrap : MonoBehaviour
         }
     }
 
-    #endregion
-
-    #region Detection & Explosion
-
     private Vector2 GetForward()
     {
-        if (forwardDirection.sqrMagnitude > 0.0001f)
-            return forwardDirection.normalized;
-
-        return Vector2.right;
+        return forwardDirection.sqrMagnitude > 0.0001f ? forwardDirection.normalized : Vector2.right;
     }
 
     private bool CanSeePlayer()
     {
-        if (player == null) return false;
+        if (player == null)
+            return false;
 
         Vector3 origin = visionOrigin.position;
         Vector2 toPlayer = player.position - origin;
         float dist = toPlayer.magnitude;
-        if (dist > viewDistance) return false;
+        if (dist > viewDistance)
+            return false;
 
         Vector2 dirToPlayer = toPlayer.normalized;
         Vector2 forward = GetForward();
-
         float signedAngle = Vector2.SignedAngle(forward, dirToPlayer);
 
         if (signedAngle > viewAngleLeft || signedAngle < -viewAngleRight)
@@ -231,26 +206,29 @@ public class ExplodingTrap : MonoBehaviour
 
     private void Explode()
     {
-        if (hasExploded) return;
+        if (hasExploded)
+            return;
+
         hasExploded = true;
         state = State.Exploded;
 
-        if (rb != null) rb.velocity = Vector2.zero;
+        if (rb != null)
+            rb.velocity = Vector2.zero;
 
-        foreach (var col in GetComponents<Collider2D>())
+        foreach (Collider2D col in GetComponents<Collider2D>())
             col.enabled = false;
 
         if (explosionRadius > 0f && damage > 0)
         {
             Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, explosionRadius, playerLayer);
-            foreach (var c in hits)
+            foreach (Collider2D c in hits)
             {
-                if (c.CompareTag("Player"))
-                {
-                    Health hp = c.GetComponent<Health>();
-                    if (hp != null)
-                        hp.TakeDamage(damage);
-                }
+                if (!c.CompareTag("Player"))
+                    continue;
+
+                Health hp = c.GetComponent<Health>();
+                if (hp != null)
+                    hp.TakeDamage(damage);
             }
         }
 
@@ -266,9 +244,24 @@ public class ExplodingTrap : MonoBehaviour
         Destroy(gameObject, destroyDelayAfterExplosion);
     }
 
+    private bool TryResolvePlayer()
+    {
+        if (!PlayerReference.IsAvailable)
+        {
+            player = null;
+            return false;
+        }
+
+        if (player != PlayerReference.Player)
+            player = PlayerReference.Player;
+
+        return player != null;
+    }
+
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        if (hasExploded) return;
+        if (hasExploded)
+            return;
 
         if (collision.collider.CompareTag("Player"))
         {
@@ -277,9 +270,7 @@ public class ExplodingTrap : MonoBehaviour
         }
 
         if (((1 << collision.gameObject.layer) & explodeOnCollisionLayers) != 0)
-        {
             Explode();
-        }
     }
 
     private void OnDrawGizmosSelected()
@@ -287,18 +278,14 @@ public class ExplodingTrap : MonoBehaviour
         Gizmos.color = Color.yellow;
 
         Vector3 origin = visionOrigin != null ? visionOrigin.position : transform.position;
-
         Vector2 forward = forwardDirection.sqrMagnitude > 0.0001f ? forwardDirection.normalized : Vector2.right;
         Vector2 leftDir = Quaternion.Euler(0, 0, viewAngleLeft) * forward;
         Vector2 rightDir = Quaternion.Euler(0, 0, -viewAngleRight) * forward;
 
-        // Sadece koni kenarları
         Gizmos.DrawLine(origin, origin + (Vector3)(leftDir * viewDistance));
         Gizmos.DrawLine(origin, origin + (Vector3)(rightDir * viewDistance));
 
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(transform.position, explosionRadius);
     }
-
-    #endregion
 }

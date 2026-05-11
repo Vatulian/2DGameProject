@@ -237,6 +237,7 @@ GameObject:
   - component: {fileID: 6459850797184872740}
   - component: {fileID: 8823104898141010799}
   - component: {fileID: 5004280239039847823}
+  - component: {fileID: 1200995142258743211}
   m_Layer: 10
   m_Name: Player
   m_TagString: Player
@@ -587,6 +588,18 @@ MonoBehaviour:
   inputQueueMemory: 0.4
   meleeHitbox: {fileID: 8657053388909573927}
   logHitboxEvents: 1
+--- !u!114 &1200995142258743211
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8068614522105042617}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1ee9f3f2388044ee8f0b90ca43ed4d08, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &8853005155900271401
 GameObject:
   m_ObjectHideFlags: 0

@@ -46,6 +46,7 @@ public class PlayerMeleeAttack : MonoBehaviour
 
     private PlayerAnimationController animationController;
     private PlayerMovement playerMovement;
+    private PlayerAttack playerAttack;
     private Health health;
 
     private int currentPhaseIndex = -1;
@@ -61,14 +62,27 @@ public class PlayerMeleeAttack : MonoBehaviour
     {
         animationController = GetComponent<PlayerAnimationController>();
         playerMovement = GetComponent<PlayerMovement>();
+        playerAttack = GetComponent<PlayerAttack>();
         health = GetComponent<Health>();
 
         if (!meleeHitbox)
             meleeHitbox = GetComponentInChildren<PlayerMeleeHitbox>();
     }
 
+    private void OnEnable()
+    {
+        if (health == null)
+            health = GetComponent<Health>();
+
+        if (health != null)
+            health.OnDamaged += HandleDamaged;
+    }
+
     private void OnDisable()
     {
+        if (health != null)
+            health.OnDamaged -= HandleDamaged;
+
         ResetCombo(health == null || !health.IsDead);
     }
 
@@ -121,8 +135,12 @@ public class PlayerMeleeAttack : MonoBehaviour
 
         if (!IsAttacking)
         {
-            if (playerMovement == null || !playerMovement.canAttack())
+            if (playerMovement == null
+                || !playerMovement.canAttack()
+                || (playerAttack != null && playerAttack.IsAttacking))
+            {
                 return;
+            }
 
             StartPhase(0);
             return;
@@ -307,6 +325,11 @@ public class PlayerMeleeAttack : MonoBehaviour
         playerMovement.ForceHorizontalVelocity(facing * speed, duration);
         yield return new WaitForSeconds(duration);
         lungeCoroutine = null;
+    }
+
+    private void HandleDamaged(float remainingHp)
+    {
+        ResetCombo(returnToLocomotion: false);
     }
 }
 

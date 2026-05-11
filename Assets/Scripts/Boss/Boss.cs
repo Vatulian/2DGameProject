@@ -4,6 +4,7 @@ using UnityEngine.UI;
 public class Boss : MonoBehaviour
 {
     private Vector3 spawnPosition;
+    private bool spawnPositionInitialized;
 
     [Header("Stats")]
     public int health = 20;
@@ -25,13 +26,13 @@ public class Boss : MonoBehaviour
 
     [Header("Door On Death")]
     [SerializeField] private DoorController doorOnDeath;
-    
+
     [Header("Arena Walls")]
     [SerializeField] private GameObject arenaWalls;
 
     private void Start()
     {
-        spawnPosition = transform.position; // boss'un ilk spawn noktası
+        CacheSpawnPositionIfNeeded();
         anim = GetComponent<Animator>();
         hitFlash = GetComponent<HitFlash>();
         hitVfx = GetComponent<BossHitVFX>();
@@ -47,7 +48,8 @@ public class Boss : MonoBehaviour
 
     private void Update()
     {
-        if (isDead) return;
+        if (isDead)
+            return;
 
         if (timeBtwDamage > 0f)
             timeBtwDamage -= Time.deltaTime;
@@ -67,11 +69,10 @@ public class Boss : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (isDead) return;
-        if (!other.CompareTag("Player")) return;
-        if (timeBtwDamage > 0f) return;
+        if (isDead || !other.CompareTag("Player") || timeBtwDamage > 0f)
+            return;
 
-        var hp = other.GetComponent<Health>();
+        Health hp = other.GetComponent<Health>();
         if (hp != null)
         {
             hp.TakeDamage(damage);
@@ -86,7 +87,8 @@ public class Boss : MonoBehaviour
 
     public void TakeDamageAt(int amount, Vector3 hitPos)
     {
-        if (isDead) return;
+        if (isDead)
+            return;
 
         health = Mathf.Max(0, health - amount);
 
@@ -108,22 +110,21 @@ public class Boss : MonoBehaviour
 
     private void Die()
     {
-        if (isDead) return;
-        isDead = true;
+        if (isDead)
+            return;
 
+        isDead = true;
         anim.SetTrigger("death");
 
         if (healthBar != null)
             healthBar.gameObject.SetActive(false);
-        
+
         if (arenaWalls != null)
             arenaWalls.SetActive(false);
 
-        // OPEN DOOR AFTER BOSS DEATH
         if (doorOnDeath != null)
             doorOnDeath.OpenDoor();
-        
-        // ACTIVATE END PORTAL AFTER BOSS DEATH
+
         if (LevelFlow.Instance != null)
         {
             LevelFlow.Instance.ActivateEndPortal();
@@ -133,33 +134,27 @@ public class Boss : MonoBehaviour
             Debug.LogError("[Boss] LevelFlow.Instance is NULL! LevelFlow object missing in scene?");
         }
 
-        // CAMERA UNLOCK + ZOOM RESET
         CameraController cam = FindObjectOfType<CameraController>();
         if (cam != null)
-        {
             cam.Unlock();
-        }
     }
+
     public void ResetBoss()
     {
+        CacheSpawnPositionIfNeeded();
+
         isDead = false;
         stageTwoTriggered = false;
-
-        // Pozisyon reset
         transform.position = spawnPosition;
-
-        // HP reset
-        health = 20; // max HP
+        health = 20;
         timeBtwDamage = 0f;
 
-        // Animator reset
         if (anim != null)
         {
             anim.Rebind();
             anim.Update(0f);
         }
 
-        // Health bar reset
         if (healthBar != null)
         {
             healthBar.maxValue = health;
@@ -168,5 +163,18 @@ public class Boss : MonoBehaviour
         }
     }
 
+    public void SetSpawnPosition(Vector3 position)
+    {
+        spawnPosition = position;
+        spawnPositionInitialized = true;
+    }
 
+    private void CacheSpawnPositionIfNeeded()
+    {
+        if (spawnPositionInitialized)
+            return;
+
+        spawnPosition = transform.position;
+        spawnPositionInitialized = true;
+    }
 }

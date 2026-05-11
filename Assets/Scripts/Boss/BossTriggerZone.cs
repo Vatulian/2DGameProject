@@ -25,15 +25,26 @@ public class BossTriggerZone : MonoBehaviour
 
     private void Start()
     {
-        if (bossObject != null) bossObject.SetActive(false);
-        if (bossHealthUI != null) bossHealthUI.SetActive(false);
-        if (arenaWalls != null) arenaWalls.DeactivateWalls();
+        if (bossObject != null)
+        {
+            Boss boss = bossObject.GetComponent<Boss>();
+            if (boss != null)
+                boss.SetSpawnPosition(bossObject.transform.position);
+
+            bossObject.SetActive(false);
+        }
+
+        if (bossHealthUI != null)
+            bossHealthUI.SetActive(false);
+
+        if (arenaWalls != null)
+            arenaWalls.DeactivateWalls();
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (triggered) return;
-        if (!other.CompareTag("Player")) return;
+        if (triggered || !other.CompareTag("Player"))
+            return;
 
         triggered = true;
         StartCoroutine(ActivateBossSequence());
@@ -43,39 +54,33 @@ public class BossTriggerZone : MonoBehaviour
     {
         yield return new WaitForSeconds(delayBeforeSpawn);
 
-        // Arena duvarları ON
-        if (arenaWalls != null) 
+        if (arenaWalls != null)
             arenaWalls.ActivateWalls();
 
-        // Kamera kilidi
         if (cameraController != null && cameraLockPoint != null)
-            cameraController.LockToPosition(cameraLockPoint.position, true); // true = bossSize kullan
+            cameraController.LockToPosition(cameraLockPoint.position, true);
 
-        // Kapıyı kapat
         if (doorToClose != null)
             doorToClose.CloseDoor();
 
-        // Boss aktif olsun
         if (bossObject != null)
             bossObject.SetActive(true);
 
-        // UI ON
         if (bossHealthUI != null)
             bossHealthUI.SetActive(true);
 
-        // Müzik
         if (bossIntroMusic != null && SoundManager.instance != null)
             SoundManager.instance.PlayMusic(bossIntroMusic, true);
 
         if (!oneTimeTrigger)
             triggered = false;
     }
+
     public void ResetBossFight()
     {
         StopAllCoroutines();
         triggered = false;
 
-        // Boss reset + kapat
         if (bossObject != null)
         {
             Boss boss = bossObject.GetComponent<Boss>();
@@ -85,21 +90,16 @@ public class BossTriggerZone : MonoBehaviour
             bossObject.SetActive(false);
         }
 
-        // Boss UI kapalı
         if (bossHealthUI != null)
             bossHealthUI.SetActive(false);
 
-        // Arena duvarları OFF
         if (arenaWalls != null)
             arenaWalls.DeactivateWalls();
 
-        // Kapı tekrar AÇIK
         if (doorToClose != null)
             doorToClose.OpenDoor();
 
-        // Kamera normal moda dön
         if (cameraController != null)
             cameraController.Unlock();
     }
-
 }

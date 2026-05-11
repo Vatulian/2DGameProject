@@ -99,7 +99,7 @@ public class CameraController : MonoBehaviour
         if (!Application.isPlaying)
         {
             cam = GetComponent<Camera>();
-            EnsureCameraRig();
+            RefreshEditorReferences();
         }
 
         ApplyCinemachineSettings();
@@ -274,6 +274,12 @@ public class CameraController : MonoBehaviour
             return;
         }
 
+        if (PlayerReference.IsAvailable)
+        {
+            player = PlayerReference.Player;
+            return;
+        }
+
         GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
         if (playerObject != null)
         {
@@ -423,6 +429,24 @@ public class CameraController : MonoBehaviour
     {
         Transform sibling = FindSiblingTransform("CM vcam");
         return sibling != null ? sibling.GetComponent<CinemachineVirtualCamera>() : null;
+    }
+
+    private void RefreshEditorReferences()
+    {
+        if (virtualCamera == null)
+        {
+            virtualCamera = FindSiblingVirtualCamera();
+        }
+
+        if (followTarget == null)
+        {
+            followTarget = FindSiblingTransform("CM Follow Target");
+        }
+
+        if (virtualCamera != null)
+        {
+            framingTransposer = virtualCamera.GetCinemachineComponent<CinemachineFramingTransposer>();
+        }
     }
 
     private Vector3 SmoothDampPerAxis(Vector3 current, Vector3 target, float horizontalSpeed, float verticalSpeed)

@@ -78,13 +78,6 @@ public class FlameEnemyAI : MonoBehaviour
 
         if (flameArea) flameArea.enabled = false;
 
-        GameObject p = GameObject.FindGameObjectWithTag("Player");
-        if (p)
-        {
-            player = p.transform;
-            playerHealth = p.GetComponent<Health>();
-        }
-
         if (flameAreaTf)
         {
             flameBaseLocalPos = flameAreaTf.localPosition;
@@ -101,7 +94,7 @@ public class FlameEnemyAI : MonoBehaviour
 
     private void Update()
     {
-        if (player == null || leftPoint == null || rightPoint == null) return;
+        if (!TryResolvePlayer() || leftPoint == null || rightPoint == null) return;
 
         switch (state)
         {
@@ -370,6 +363,24 @@ public class FlameEnemyAI : MonoBehaviour
     {
         if (flameArea) flameArea.enabled = false;
         state = State.Patrol;
+    }
+
+    private bool TryResolvePlayer()
+    {
+        if (!PlayerReference.IsAvailable)
+        {
+            player = null;
+            playerHealth = null;
+            return false;
+        }
+
+        if (player != PlayerReference.Player)
+        {
+            player = PlayerReference.Player;
+            playerHealth = PlayerReference.Health;
+        }
+
+        return player != null && playerHealth != null;
     }
 
     private void OnDrawGizmosSelected()

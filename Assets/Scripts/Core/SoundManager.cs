@@ -19,7 +19,7 @@ public class SoundManager : MonoBehaviour
         if (instance == null)
         {
             instance = this;
-            DontDestroyOnLoad(transform.root.gameObject);
+            DontDestroyOnLoad(gameObject);
         }
         else if (instance != this)
         {

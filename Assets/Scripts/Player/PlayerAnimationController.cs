@@ -41,6 +41,29 @@ public class PlayerAnimationController : MonoBehaviour
         if (anim) defaultAnimatorSpeed = anim.speed;
     }
 
+    private void OnEnable()
+    {
+        if (health == null)
+            health = GetComponent<Health>();
+
+        if (health == null)
+            return;
+
+        health.OnDamaged += HandleDamaged;
+        health.OnDeath += HandleDeath;
+        health.OnRespawned += HandleRespawned;
+    }
+
+    private void OnDisable()
+    {
+        if (health == null)
+            return;
+
+        health.OnDamaged -= HandleDamaged;
+        health.OnDeath -= HandleDeath;
+        health.OnRespawned -= HandleRespawned;
+    }
+
     private void Update()
     {
         if (!anim || !movement)
@@ -156,6 +179,24 @@ public class PlayerAnimationController : MonoBehaviour
             return;
 
         anim.speed = defaultAnimatorSpeed;
+    }
+
+    private void HandleDamaged(float remainingHp)
+    {
+        if (remainingHp <= 0f)
+            return;
+
+        PlayHurt();
+    }
+
+    private void HandleDeath()
+    {
+        PlayDeath();
+    }
+
+    private void HandleRespawned()
+    {
+        PlayRespawn();
     }
 
     private bool IsLocomotionLocked()
