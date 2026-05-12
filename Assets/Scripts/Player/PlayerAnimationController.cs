@@ -111,6 +111,18 @@ public class PlayerAnimationController : MonoBehaviour
         anim.CrossFadeInFixedTime(stateName, Mathf.Clamp(transitionDuration, 0f, 0.08f));
     }
 
+    public void PlayLockedState(string stateName, float transitionDuration, float lockDuration)
+    {
+        if (!anim || string.IsNullOrWhiteSpace(stateName))
+            return;
+
+        anim.ResetTrigger(HurtHash);
+        anim.ResetTrigger(DieHash);
+        LockLocomotion(lockDuration);
+        currentLocomotionStateName = null;
+        anim.CrossFadeInFixedTime(stateName, Mathf.Clamp(transitionDuration, 0f, 0.12f));
+    }
+
     public void PlayHurt()
     {
         if (!anim) return;

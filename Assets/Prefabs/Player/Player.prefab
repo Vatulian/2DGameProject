@@ -238,6 +238,7 @@ GameObject:
   - component: {fileID: 8823104898141010799}
   - component: {fileID: 5004280239039847823}
   - component: {fileID: 1200995142258743211}
+  - component: {fileID: 6622026058386142191}
   m_Layer: 10
   m_Name: Player
   m_TagString: Player
@@ -424,6 +425,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   attackCooldown: 0.5
+  attackLockDuration: 0.2
   firePoint: {fileID: 184749468938867716}
   fireballs:
   - {fileID: 0}
@@ -489,7 +491,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c96adebb403f2a74b88f7dbb922bc70e, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  checkpoint: {fileID: 8300000, guid: 7512d13d3c05167488e033a081e5879f, type: 3}
+  checkpointSound: {fileID: 8300000, guid: 7512d13d3c05167488e033a081e5879f, type: 3}
 --- !u!114 &6459850797184872740
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -600,6 +602,28 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1ee9f3f2388044ee8f0b90ca43ed4d08, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+--- !u!114 &6622026058386142191
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8068614522105042617}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d596299bc75c65f46b87145f0b24c581, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  parryKey: 113
+  activeTime: 1
+  cooldownTime: 1
+  lockMovementTime: 0.12
+  parryPoseStateName: Swordmaster_Block_Pose
+  parrySuccessStateName: Swordmaster_Block
+  animationTransitionTime: 0.03
+  successAnimationLockTime: 0.45
+  parryStartSound: {fileID: 0}
+  parrySuccessSound: {fileID: 0}
 --- !u!1 &8853005155900271401
 GameObject:
   m_ObjectHideFlags: 0
