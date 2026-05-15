@@ -542,7 +542,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b770baebadbfd8446b2eeb3eb18844a1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  attackKey: 102
+  attackKey: 323
   phases:
   - animatorStateName: Swordmaster_Slash_1
     transitionDuration: 0.005
@@ -557,7 +557,11 @@ MonoBehaviour:
     allowJumpCancel: 1
     allowDashCancel: 1
     allowParryCancel: 1
-    attackSound: {fileID: 0}
+    attackSound: {fileID: 8300000, guid: 5520580e8975a9d43bfae0b7bff5b67e, type: 3}
+    attackSoundMinVolume: 0.8
+    attackSoundMaxVolume: 0.95
+    attackSoundMinPitch: 1.02
+    attackSoundMaxPitch: 1.12
   - animatorStateName: Swordmaster_Slash_2
     transitionDuration: 0.005
     animationSpeed: 2
@@ -571,7 +575,11 @@ MonoBehaviour:
     allowJumpCancel: 1
     allowDashCancel: 1
     allowParryCancel: 1
-    attackSound: {fileID: 0}
+    attackSound: {fileID: 8300000, guid: 5520580e8975a9d43bfae0b7bff5b67e, type: 3}
+    attackSoundMinVolume: 0.9
+    attackSoundMaxVolume: 1.05
+    attackSoundMinPitch: 0.95
+    attackSoundMaxPitch: 1.05
   - animatorStateName: Swordmaster_Spin_Attack
     transitionDuration: 0.01
     animationSpeed: 2
@@ -585,7 +593,11 @@ MonoBehaviour:
     allowJumpCancel: 1
     allowDashCancel: 1
     allowParryCancel: 1
-    attackSound: {fileID: 0}
+    attackSound: {fileID: 8300000, guid: 5520580e8975a9d43bfae0b7bff5b67e, type: 3}
+    attackSoundMinVolume: 1
+    attackSoundMaxVolume: 1.15
+    attackSoundMinPitch: 0.86
+    attackSoundMaxPitch: 0.96
   comboResetDelay: 0.75
   inputQueueMemory: 0.4
   meleeHitbox: {fileID: 8657053388909573927}

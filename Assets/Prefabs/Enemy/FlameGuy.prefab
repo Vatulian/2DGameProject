@@ -178,11 +178,15 @@ MonoBehaviour:
   anim: {fileID: 7095075091151038219}
   flameAreaTf: {fileID: 2932946316147135009}
   flameArea: {fileID: 2712297391552338574}
+  bodyCollider: {fileID: 6492090817937903286}
   leftPoint: {fileID: 7868078010207044270}
   rightPoint: {fileID: 4447696914363416468}
-  viewDistance: 3.36
+  detectionOrigin: {fileID: 1563857284690441557}
+  viewDistance: 4.74
   upperAngle: 34.1
   lowerAngle: 0
+  awarenessRadius: 4.75
+  attackDistance: 3.2
   playerLayer:
     serializedVersion: 2
     m_Bits: 1024
@@ -192,7 +196,16 @@ MonoBehaviour:
   useLineOfSight: 1
   patrolSpeed: 2
   endIdleTime: 1
-  attackDangerType: 1
+  chaseSpeed: 2.7
+  chaseLeashExtra: 2
+  groundLayers:
+    serializedVersion: 2
+    m_Bits: 256
+  groundCheckForwardOffset: 0.37
+  groundCheckDownDistance: 1
+  groundCheckVerticalOffset: 0.08
+  turnPrepTime: 0.3
+  damageAggroTime: 1.5
   prepTime: 0.5
   flameDuration: 1.2
   damageInterval: 0.25
@@ -202,9 +215,6 @@ MonoBehaviour:
   lockFacingDuringAttack: 1
   retreatDistance: 1.15
   retreatSpeed: 1.5
-  tintSpriteDuringPrep: 1
-  yellowAttackColor: {r: 1, g: 0.9, b: 0.35, a: 1}
-  redAttackColor: {r: 1, g: 0.35, b: 0.35, a: 1}
 --- !u!114 &9133208850052758096
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -232,11 +242,11 @@ Rigidbody2D:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 3146754720477835796}
-  m_BodyType: 0
+  m_BodyType: 1
   m_Simulated: 1
   m_UseFullKinematicContacts: 0
   m_UseAutoMass: 0
-  m_Mass: 1
+  m_Mass: 4
   m_LinearDrag: 0
   m_AngularDrag: 0.05
   m_GravityScale: 1

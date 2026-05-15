@@ -30,10 +30,14 @@ public class PlayerMeleeAttack : MonoBehaviour
         public bool allowDashCancel = true;
         public bool allowParryCancel = true;
         public AudioClip attackSound;
+        [Range(0f, 2f)] public float attackSoundMinVolume = 0.85f;
+        [Range(0f, 2f)] public float attackSoundMaxVolume = 1.05f;
+        [Range(0.1f, 3f)] public float attackSoundMinPitch = 0.92f;
+        [Range(0.1f, 3f)] public float attackSoundMaxPitch = 1.08f;
     }
 
     [Header("Input")]
-    [SerializeField] private KeyCode attackKey = KeyCode.Mouse1;
+    [SerializeField] private KeyCode attackKey = KeyCode.Mouse0;
 
     [Header("Combo")]
     [SerializeField] private AttackPhase[] phases;
@@ -163,6 +167,9 @@ public class PlayerMeleeAttack : MonoBehaviour
         comboResetTimer = comboResetDelay;
 
         AttackPhase phase = phases[currentPhaseIndex];
+        if (playerMovement != null && playerMovement.IsAirborne())
+            playerMovement.ApplyAirAttackFloat();
+
         playerMovement?.SetExternalRunMultiplier(0f);
         meleeHitbox?.Configure(phase.damage, phase.hitboxSize, phase.hitboxOffset, phase.hitboxAnchor);
 
@@ -173,7 +180,16 @@ public class PlayerMeleeAttack : MonoBehaviour
         }
 
         if (SoundManager.instance && phase.attackSound)
-            SoundManager.instance.PlaySound(phase.attackSound);
+        {
+            float volume = Random.Range(
+                Mathf.Min(phase.attackSoundMinVolume, phase.attackSoundMaxVolume),
+                Mathf.Max(phase.attackSoundMinVolume, phase.attackSoundMaxVolume));
+            float pitch = Random.Range(
+                Mathf.Min(phase.attackSoundMinPitch, phase.attackSoundMaxPitch),
+                Mathf.Max(phase.attackSoundMinPitch, phase.attackSoundMaxPitch));
+
+            SoundManager.instance.PlaySound(phase.attackSound, volume, pitch);
+        }
 
         StartLunge(phase);
     }
@@ -261,6 +277,8 @@ public class PlayerMeleeAttack : MonoBehaviour
 
     public void ResetCombo(bool returnToLocomotion)
     {
+        bool shouldStartAirRestartGrace = playerMovement != null && playerMovement.IsAirborne();
+
         comboResetTimer = 0f;
         queuedInputTimer = 0f;
         queuedAttackCount = 0;
@@ -268,6 +286,7 @@ public class PlayerMeleeAttack : MonoBehaviour
         StopLunge();
         meleeHitbox?.EndSwing();
         playerMovement?.ClearForcedHorizontalVelocity();
+        playerMovement?.ClearAirAttackFloat(shouldStartAirRestartGrace);
         playerMovement?.ResetExternalRunMultiplier();
         animationController?.ResetAnimatorSpeed();
         if (returnToLocomotion)

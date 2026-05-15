@@ -3,6 +3,7 @@ using UnityEngine;
 public class BloodKnightAnimationEvents : MonoBehaviour
 {
     [SerializeField] private BloodKnightAttack attack;
+    [SerializeField] private BloodKnightDamageReaction damageReaction;
 
     private void Awake()
     {
@@ -15,6 +16,9 @@ public class BloodKnightAnimationEvents : MonoBehaviour
 
         if (attack == null)
             attack = GetComponentInParent<BloodKnightAttack>();
+
+        if (damageReaction == null)
+            damageReaction = GetComponentInParent<BloodKnightDamageReaction>();
     }
 
     public void EnableHitbox()
@@ -25,5 +29,10 @@ public class BloodKnightAnimationEvents : MonoBehaviour
     public void DisableHitbox()
     {
         attack?.DisableHitbox();
+    }
+
+    public void DeactivateSelf()
+    {
+        damageReaction?.DeactivateSelf();
     }
 }

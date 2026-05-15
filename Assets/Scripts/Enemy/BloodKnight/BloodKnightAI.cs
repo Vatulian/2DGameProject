@@ -7,7 +7,14 @@ public class BloodKnightAI : MonoBehaviour
     {
         Patrol,
         Chase,
+        LostPlayer,
+        ReturnToPatrol,
+        TurnPrep,
+        ChasePrep,
+        AttackPrep,
         Attack,
+        AttackRecovery,
+        HitStun,
         Parried
     }
 
@@ -24,16 +31,30 @@ public class BloodKnightAI : MonoBehaviour
     [SerializeField] private float patrolSpeed = 1.5f;
     [SerializeField] private float turnPause = 0.35f;
 
+    [Header("Movement Safety")]
+    [SerializeField] private float chaseLeashExtra = 2f;
+    [SerializeField] private LayerMask groundLayers = 1 << 8;
+    [SerializeField] private float groundCheckForwardOffset = 0.55f;
+    [SerializeField] private float groundCheckDownDistance = 1.2f;
+    [SerializeField] private float groundCheckVerticalOffset = 0.08f;
+
     [Header("Detection")]
     [SerializeField] private float detectionDistance = 2.2f;
+    [SerializeField] private float awarenessRadius = 3.2f;
+    [SerializeField] private float awarenessPadding = 0.75f;
     [SerializeField] private float attackDistance = 0.9f;
     [SerializeField] private float chaseSpeed = 2.1f;
+    [SerializeField] private float lostPlayerSpeed = 1.8f;
+    [SerializeField] private float lostPlayerWaitTime = 1.2f;
+    [SerializeField] private float turnPrepTime = 0.4f;
     [SerializeField] private LayerMask playerLayer;
     [SerializeField] private LayerMask obstructionLayers;
 
     [Header("Attack Flow")]
     [SerializeField] private float attackCooldown = 1f;
+    [SerializeField] private float attackPrepTime = 0.25f;
     [SerializeField] private float attackStateDuration = 0.65f;
+    [SerializeField] private float attackRecoveryTime = 0.35f;
     [SerializeField] private float parriedStunTime = 0.7f;
 
     [Header("Animation States")]
@@ -50,7 +71,20 @@ public class BloodKnightAI : MonoBehaviour
     private float timer;
     private float cooldownTimer;
     private bool waitingAtTurn;
+    private bool waitingAtLostPosition;
+    private Vector3 lastKnownPlayerPos;
     private string currentAnim = "";
+
+    public int Facing => facing;
+
+    private void OnValidate()
+    {
+        awarenessPadding = Mathf.Max(0f, awarenessPadding);
+        awarenessRadius = Mathf.Max(awarenessRadius, detectionDistance + awarenessPadding);
+        chaseLeashExtra = Mathf.Max(0f, chaseLeashExtra);
+        groundCheckForwardOffset = Mathf.Max(0f, groundCheckForwardOffset);
+        groundCheckDownDistance = Mathf.Max(0.05f, groundCheckDownDistance);
+    }
 
     private void Awake()
     {
@@ -99,8 +133,29 @@ public class BloodKnightAI : MonoBehaviour
             case State.Chase:
                 TickChase();
                 break;
+            case State.LostPlayer:
+                TickLostPlayer();
+                break;
+            case State.ReturnToPatrol:
+                TickReturnToPatrol();
+                break;
+            case State.TurnPrep:
+                TickTurnPrep();
+                break;
+            case State.ChasePrep:
+                TickChasePrep();
+                break;
+            case State.AttackPrep:
+                TickAttackPrep();
+                break;
             case State.Attack:
                 TickAttack();
+                break;
+            case State.AttackRecovery:
+                TickAttackRecovery();
+                break;
+            case State.HitStun:
+                TickHitStun();
                 break;
             case State.Parried:
                 TickParried();
@@ -112,7 +167,7 @@ public class BloodKnightAI : MonoBehaviour
     {
         if (cooldownTimer >= attackCooldown && CanDetectPlayerAhead())
         {
-            state = State.Chase;
+            StartChase(GetPlayerTransform());
             return;
         }
 
@@ -120,6 +175,12 @@ public class BloodKnightAI : MonoBehaviour
         {
             Stop();
             Play(idleStateName);
+            return;
+        }
+
+        if (!IsInsidePatrolBounds())
+        {
+            StartReturnToPatrol();
             return;
         }
 
@@ -139,6 +200,12 @@ public class BloodKnightAI : MonoBehaviour
             return;
         }
 
+        if (!CanMoveInDirection(facing, false))
+        {
+            StartPatrolTurn();
+            return;
+        }
+
         Play(runStateName);
         rb.velocity = new Vector2(facing * patrolSpeed, 0f);
 
@@ -149,29 +216,274 @@ public class BloodKnightAI : MonoBehaviour
         if (reachedPoint)
         {
             transform.position = new Vector3(targetX, transform.position.y, transform.position.z);
-            waitingAtTurn = true;
-            timer = turnPause;
+            StartPatrolTurn();
         }
     }
 
     private void TickChase()
     {
-        if (!CanDetectPlayerAhead())
+        Transform player = GetPlayerTransform();
+
+        if (!CanSensePlayerInAwareness(player))
         {
-            state = State.Patrol;
-            Stop();
+            StartLostPlayer();
+            return;
+        }
+
+        if (player != null)
+            lastKnownPlayerPos = player.position;
+
+        if (IsPlayerBehind(player))
+        {
+            StartTurnPrep();
             return;
         }
 
         if (cooldownTimer >= attackCooldown && CanReachPlayerWithAttackRay())
         {
-            StartAttack();
+            StartAttackPrep();
+            return;
+        }
+
+        if (!CanMoveInDirection(facing, true))
+        {
+            Stop();
+            Play(idleStateName);
             return;
         }
 
         Play(runStateName);
         rb.velocity = new Vector2(facing * chaseSpeed, 0f);
-        ClampToPatrolBounds();
+        ClampToCombatBounds();
+    }
+
+    private void StartChase(Transform player)
+    {
+        state = State.Chase;
+        waitingAtLostPosition = false;
+
+        if (player != null)
+            lastKnownPlayerPos = player.position;
+    }
+
+    private void StartLostPlayer()
+    {
+        state = State.LostPlayer;
+        waitingAtLostPosition = false;
+        Stop();
+    }
+
+    private void TickLostPlayer()
+    {
+        Transform player = GetPlayerTransform();
+        if (CanSensePlayerInAwareness(player) || CanDetectPlayerAhead())
+        {
+            StartChase(player);
+            return;
+        }
+
+        Vector3 target = ClampPositionToPatrolBounds(lastKnownPlayerPos);
+        float distanceX = Mathf.Abs(target.x - transform.position.x);
+
+        if (distanceX < 0.15f)
+        {
+            WaitAtLostPosition();
+            return;
+        }
+
+        int nextFacing = target.x >= transform.position.x ? 1 : -1;
+        if (nextFacing != facing)
+        {
+            facing = nextFacing;
+            ApplyFacing();
+        }
+
+        if (!CanMoveInDirection(facing, true))
+        {
+            WaitAtLostPosition();
+            return;
+        }
+
+        Play(runStateName);
+        rb.velocity = new Vector2(facing * lostPlayerSpeed, 0f);
+        ClampToCombatBounds();
+    }
+
+    private void WaitAtLostPosition()
+    {
+        if (!waitingAtLostPosition)
+        {
+            waitingAtLostPosition = true;
+            timer = lostPlayerWaitTime;
+        }
+
+        Stop();
+        Play(idleStateName);
+        timer -= Time.deltaTime;
+
+        if (timer <= 0f)
+        {
+            waitingAtLostPosition = false;
+            StartReturnToPatrol();
+        }
+    }
+
+    private void StartReturnToPatrol()
+    {
+        state = State.ReturnToPatrol;
+        waitingAtTurn = false;
+        waitingAtLostPosition = false;
+        Stop();
+    }
+
+    private void TickReturnToPatrol()
+    {
+        if (leftPoint == null || rightPoint == null)
+        {
+            state = State.Patrol;
+            return;
+        }
+
+        if (IsInsidePatrolBounds())
+        {
+            state = State.Patrol;
+            return;
+        }
+
+        float targetX = Mathf.Clamp(transform.position.x, leftX, rightX);
+        int returnDirection = targetX >= transform.position.x ? 1 : -1;
+
+        if (returnDirection != facing)
+        {
+            facing = returnDirection;
+            ApplyFacing();
+        }
+
+        if (!HasGroundAhead(returnDirection))
+        {
+            Stop();
+            Play(idleStateName);
+            return;
+        }
+
+        Play(runStateName);
+        rb.velocity = new Vector2(returnDirection * lostPlayerSpeed, 0f);
+
+        bool reachedPatrol = (returnDirection > 0 && transform.position.x >= targetX)
+            || (returnDirection < 0 && transform.position.x <= targetX);
+
+        if (reachedPatrol)
+        {
+            transform.position = new Vector3(targetX, transform.position.y, transform.position.z);
+            Stop();
+            state = State.Patrol;
+        }
+    }
+
+    private void StartTurnPrep()
+    {
+        state = State.TurnPrep;
+        timer = turnPrepTime;
+        Stop();
+        Play(idleStateName);
+    }
+
+    private void StartChasePrep()
+    {
+        state = State.ChasePrep;
+        timer = turnPrepTime;
+        waitingAtTurn = false;
+        waitingAtLostPosition = false;
+        Stop();
+        Play(idleStateName);
+    }
+
+    private void TickTurnPrep()
+    {
+        Stop();
+        Play(idleStateName);
+
+        Transform player = GetPlayerTransform();
+        if (!CanSensePlayerInAwareness(player))
+        {
+            StartLostPlayer();
+            return;
+        }
+
+        lastKnownPlayerPos = player.position;
+
+        if (player != null && !IsPlayerBehind(player))
+        {
+            state = State.Chase;
+            return;
+        }
+
+        timer -= Time.deltaTime;
+        if (timer > 0f)
+            return;
+
+        facing *= -1;
+        ApplyFacing();
+
+        Transform latestPlayer = GetPlayerTransform();
+        if (latestPlayer != null)
+            lastKnownPlayerPos = latestPlayer.position;
+
+        state = State.Chase;
+    }
+
+    private void TickChasePrep()
+    {
+        Stop();
+        Play(idleStateName);
+
+        Transform player = GetPlayerTransform();
+        if (player == null)
+        {
+            StartReturnToPatrol();
+            return;
+        }
+
+        lastKnownPlayerPos = player.position;
+
+        timer -= Time.deltaTime;
+        if (timer > 0f)
+            return;
+
+        FacePlayer(player);
+        StartChase(player);
+    }
+
+    private void StartAttackPrep()
+    {
+        state = State.AttackPrep;
+        timer = attackPrepTime;
+        Stop();
+        Play(idleStateName);
+    }
+
+    private void TickAttackPrep()
+    {
+        Stop();
+
+        Transform player = GetPlayerTransform();
+        if (!CanSensePlayerInAwareness(player))
+        {
+            StartLostPlayer();
+            return;
+        }
+
+        lastKnownPlayerPos = player.position;
+
+        if (!CanReachPlayerWithAttackRay())
+        {
+            state = State.Chase;
+            return;
+        }
+
+        timer -= Time.deltaTime;
+        if (timer <= 0f)
+            StartAttack();
     }
 
     private void StartAttack()
@@ -202,7 +514,52 @@ public class BloodKnightAI : MonoBehaviour
             return;
 
         attack?.DisableHitbox();
-        state = State.Patrol;
+        StartAttackRecovery();
+    }
+
+    private void StartAttackRecovery()
+    {
+        state = State.AttackRecovery;
+        timer = attackRecoveryTime;
+        Stop();
+        Play(idleStateName);
+    }
+
+    private void TickAttackRecovery()
+    {
+        Stop();
+        timer -= Time.deltaTime;
+
+        if (timer > 0f)
+            return;
+
+        Transform player = GetPlayerTransform();
+        if (CanSensePlayerInAwareness(player) || CanDetectPlayerAhead())
+            StartChase(player);
+        else
+            StartLostPlayer();
+    }
+
+    public void InterruptForHit(float duration)
+    {
+        state = State.HitStun;
+        timer = Mathf.Max(0f, duration);
+        waitingAtTurn = false;
+        currentAnim = "";
+        Stop();
+        attack?.DisableHitbox();
+    }
+
+    private void TickHitStun()
+    {
+        Stop();
+        timer -= Time.deltaTime;
+
+        if (timer <= 0f)
+        {
+            currentAnim = "";
+            StartChasePrep();
+        }
     }
 
     private void StartParried()
@@ -219,7 +576,14 @@ public class BloodKnightAI : MonoBehaviour
         timer -= Time.deltaTime;
 
         if (timer <= 0f)
-            state = State.Patrol;
+            StartReturnToPatrol();
+    }
+
+    private void StartPatrolTurn()
+    {
+        Stop();
+        waitingAtTurn = true;
+        timer = turnPause;
     }
 
     private bool CanDetectPlayerAhead()
@@ -242,6 +606,29 @@ public class BloodKnightAI : MonoBehaviour
         return hit.collider != null && hit.collider.CompareTag("Player");
     }
 
+    private bool CanSensePlayerInAwareness(Transform player)
+    {
+        if (player == null)
+            return false;
+
+        Vector2 origin = detectionOrigin != null ? detectionOrigin.position : transform.position;
+        Vector2 target = player.position;
+
+        if (Vector2.Distance(origin, target) > GetEffectiveAwarenessRadius())
+            return false;
+
+        if (obstructionLayers.value == 0)
+            return true;
+
+        RaycastHit2D wallHit = Physics2D.Linecast(origin, target, obstructionLayers);
+        return wallHit.collider == null;
+    }
+
+    private float GetEffectiveAwarenessRadius()
+    {
+        return Mathf.Max(awarenessRadius, detectionDistance + awarenessPadding);
+    }
+
     private void ApplyFacing()
     {
         if (visual == null)
@@ -254,9 +641,93 @@ public class BloodKnightAI : MonoBehaviour
         attack?.SetFacing(facing);
     }
 
+    private void FacePlayerIfAvailable()
+    {
+        if (!PlayerReference.IsAvailable)
+            return;
+
+        Transform player = PlayerReference.Player;
+        if (player == null)
+            return;
+
+        FacePlayer(player);
+    }
+
+    private void FacePlayer(Transform player)
+    {
+        int nextFacing = player.position.x >= transform.position.x ? 1 : -1;
+        if (nextFacing == facing)
+            return;
+
+        facing = nextFacing;
+        ApplyFacing();
+    }
+
+    private Transform GetPlayerTransform()
+    {
+        if (!PlayerReference.IsAvailable)
+            return null;
+
+        return PlayerReference.Player;
+    }
+
+    private bool IsPlayerBehind(Transform player)
+    {
+        if (player == null)
+            return false;
+
+        float toPlayerX = player.position.x - transform.position.x;
+        if (Mathf.Approximately(toPlayerX, 0f))
+            return false;
+
+        return Mathf.Sign(toPlayerX) != facing;
+    }
+
     private void Stop()
     {
         rb.velocity = Vector2.zero;
+    }
+
+    private bool CanMoveInDirection(int direction, bool useCombatBounds)
+    {
+        return IsWithinMovementBounds(direction, useCombatBounds) && HasGroundAhead(direction);
+    }
+
+    private bool IsWithinMovementBounds(int direction, bool useCombatBounds)
+    {
+        if (leftPoint == null || rightPoint == null)
+            return true;
+
+        float minX = useCombatBounds ? leftX - chaseLeashExtra : leftX;
+        float maxX = useCombatBounds ? rightX + chaseLeashExtra : rightX;
+        float probeX = transform.position.x + Mathf.Sign(direction) * groundCheckForwardOffset;
+
+        return probeX >= minX && probeX <= maxX;
+    }
+
+    private bool IsInsidePatrolBounds()
+    {
+        if (leftPoint == null || rightPoint == null)
+            return true;
+
+        return transform.position.x >= leftX && transform.position.x <= rightX;
+    }
+
+    private bool HasGroundAhead(int direction)
+    {
+        if (groundLayers.value == 0)
+            return true;
+
+        Vector2 origin = GetGroundCheckOrigin(direction);
+        RaycastHit2D hit = Physics2D.Raycast(origin, Vector2.down, groundCheckDownDistance, groundLayers);
+        return hit.collider != null;
+    }
+
+    private Vector2 GetGroundCheckOrigin(int direction)
+    {
+        Bounds bounds = bodyCollider != null ? bodyCollider.bounds : new Bounds(transform.position, Vector3.one);
+        Vector2 foot = new Vector2(bounds.center.x, bounds.min.y + groundCheckVerticalOffset);
+        return foot + Vector2.right * Mathf.Sign(direction) * groundCheckForwardOffset;
     }
 
     private void CachePatrolBounds()
@@ -288,6 +759,28 @@ public class BloodKnightAI : MonoBehaviour
         Stop();
     }
 
+    public Vector3 ClampPositionToPatrolBounds(Vector3 position)
+    {
+        if (leftPoint == null || rightPoint == null)
+            return position;
+
+        position.x = Mathf.Clamp(position.x, leftX - chaseLeashExtra, rightX + chaseLeashExtra);
+        return position;
+    }
+
+    private void ClampToCombatBounds()
+    {
+        if (leftPoint == null || rightPoint == null)
+            return;
+
+        float clampedX = Mathf.Clamp(transform.position.x, leftX - chaseLeashExtra, rightX + chaseLeashExtra);
+        if (Mathf.Approximately(clampedX, transform.position.x))
+            return;
+
+        transform.position = new Vector3(clampedX, transform.position.y, transform.position.z);
+        Stop();
+    }
+
     private void Play(string stateName)
     {
         if (string.IsNullOrWhiteSpace(stateName) || anim == null || anim.runtimeAnimatorController == null)
@@ -309,7 +802,14 @@ public class BloodKnightAI : MonoBehaviour
         Gizmos.color = Color.yellow;
         Gizmos.DrawLine(originTf.position, originTf.position + direction * detectionDistance);
 
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawWireSphere(originTf.position, GetEffectiveAwarenessRadius());
+
         Gizmos.color = Color.red;
         Gizmos.DrawLine(originTf.position, originTf.position + direction * attackDistance);
+
+        Gizmos.color = Color.green;
+        Vector3 groundOrigin = GetGroundCheckOrigin(drawFacing);
+        Gizmos.DrawLine(groundOrigin, groundOrigin + Vector3.down * groundCheckDownDistance);
     }
 }

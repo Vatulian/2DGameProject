@@ -44,6 +44,20 @@ public class SoundManager : MonoBehaviour
         soundSource.PlayOneShot(_sound);
     }
 
+    public void PlaySound(AudioClip _sound, float volumeScale, float pitch)
+    {
+        if (_sound == null || soundSource == null)
+        {
+            Debug.LogWarning("[SoundManager] PlaySound: clip veya source null!");
+            return;
+        }
+
+        float originalPitch = soundSource.pitch;
+        soundSource.pitch = Mathf.Max(0.01f, pitch);
+        soundSource.PlayOneShot(_sound, Mathf.Max(0f, volumeScale));
+        soundSource.pitch = originalPitch;
+    }
+
     // ---------------------------- MUSIC ----------------------------
     public void PlayMusic(AudioClip _music, bool loop = true)
     {

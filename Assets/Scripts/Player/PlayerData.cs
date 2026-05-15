@@ -44,6 +44,17 @@ public class PlayerData : ScriptableObject
     public float jumpHangAccelerationMult;
     public float jumpHangMaxSpeedMult;
 
+    [Header("Air Attack")]
+    public bool enableAirAttackFloat = true;
+    [Range(0f, 1f)] public float airAttackGravityMult = 0.25f;
+    public float airAttackFloatDuration = 0.18f;
+    public float airAttackMaxFallSpeed = 2.5f;
+    public float airAttackStartFallSpeed = 0.5f;
+    public float airAttackMaxUpwardSpeed = 0f;
+    public float airAttackRestartGraceTime = 0.2f;
+    [Range(0f, 1f)] public float airAttackGraceGravityMult = 0.5f;
+    public float airAttackGraceMaxFallSpeed = 4f;
+
     [Header("Extra Jump")]
     public int extraJumpCount = 1; //How many extra jumps the player can perform in air
     [Range(0.5f, 1.5f)] public float extraJumpForceMultiplier = 1f; //Multiplier for extra jump force compared to normal jump
@@ -107,6 +118,12 @@ public class PlayerData : ScriptableObject
         runAcceleration = Mathf.Clamp(runAcceleration, 0.01f, runMaxSpeed);
         runDecceleration = Mathf.Clamp(runDecceleration, 0.01f, runMaxSpeed);
         extraJumpCount = Mathf.Max(0, extraJumpCount);
+        airAttackFloatDuration = Mathf.Max(0f, airAttackFloatDuration);
+        airAttackMaxFallSpeed = Mathf.Max(0f, airAttackMaxFallSpeed);
+        airAttackStartFallSpeed = Mathf.Max(0f, airAttackStartFallSpeed);
+        airAttackMaxUpwardSpeed = Mathf.Max(0f, airAttackMaxUpwardSpeed);
+        airAttackRestartGraceTime = Mathf.Max(0f, airAttackRestartGraceTime);
+        airAttackGraceMaxFallSpeed = Mathf.Max(0f, airAttackGraceMaxFallSpeed);
         #endregion
     }
 }

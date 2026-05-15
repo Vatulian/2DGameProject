@@ -12,7 +12,7 @@ public class DropThroughPlatform : MonoBehaviour
 
     private void OnTriggerStay2D(Collider2D col)
     {
-        if (col.CompareTag("OneWayPlatform"))
+        if (col.gameObject.tag == "OneWayPlatform")
         {
             // Aşağı yön tuşuna + Jump’a basılıyorsa
             if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow))

@@ -4,8 +4,11 @@ using UnityEngine;
 public class BloodKnightAttack : MonoBehaviour
 {
     [Header("Refs")]
-    [SerializeField] private Collider2D attackCollider;
-    [SerializeField] private bool mirrorColliderOffset = true;
+    [SerializeField] private BoxCollider2D attackCollider;
+
+    [Header("Hitbox")]
+    [SerializeField] private Vector2 hitboxSize = new Vector2(1.1f, 1f);
+    [SerializeField] private Vector2 rightFacingOffset = new Vector2(0.8f, 0f);
 
     [Header("Damage")]
     [SerializeField] private int damage = 1;
@@ -17,7 +20,7 @@ public class BloodKnightAttack : MonoBehaviour
     private readonly HashSet<Collider2D> hitTargets = new HashSet<Collider2D>();
 
     private Transform owner;
-    private Vector2 baseColliderOffset;
+    private int facing = 1;
     private bool active;
 
     public bool WasParried { get; private set; }
@@ -25,13 +28,13 @@ public class BloodKnightAttack : MonoBehaviour
     private void Awake()
     {
         if (attackCollider == null)
-            attackCollider = GetComponent<Collider2D>();
+            attackCollider = GetComponent<BoxCollider2D>();
 
         if (attackCollider != null)
         {
-            baseColliderOffset = attackCollider.offset;
             attackCollider.isTrigger = true;
             attackCollider.enabled = false;
+            ApplyHitboxShape();
         }
     }
 
@@ -46,11 +49,8 @@ public class BloodKnightAttack : MonoBehaviour
 
     public void SetFacing(int facing)
     {
-        if (!mirrorColliderOffset || attackCollider == null)
-            return;
-
-        int direction = facing >= 0 ? 1 : -1;
-        attackCollider.offset = new Vector2(Mathf.Abs(baseColliderOffset.x) * direction, baseColliderOffset.y);
+        this.facing = facing >= 0 ? 1 : -1;
+        ApplyHitboxShape();
     }
 
     public void EnableHitbox()
@@ -114,5 +114,22 @@ public class BloodKnightAttack : MonoBehaviour
 
         WasParried = true;
         return true;
+    }
+
+    private void ApplyHitboxShape()
+    {
+        if (attackCollider == null)
+            return;
+
+        attackCollider.size = hitboxSize;
+        attackCollider.offset = new Vector2(Mathf.Abs(rightFacingOffset.x) * facing, rightFacingOffset.y);
+    }
+
+    private void OnValidate()
+    {
+        if (attackCollider == null)
+            attackCollider = GetComponent<BoxCollider2D>();
+
+        ApplyHitboxShape();
     }
 }

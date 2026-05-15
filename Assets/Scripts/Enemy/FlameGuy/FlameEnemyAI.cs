@@ -1,26 +1,42 @@
 using UnityEngine;
 
+[RequireComponent(typeof(Rigidbody2D))]
 public class FlameEnemyAI : MonoBehaviour
 {
-    private enum State { Patrol, WaitAtEnd, Prep, Flame, Recovery }
+    private enum State
+    {
+        Patrol,
+        WaitAtEnd,
+        Chase,
+        TurnPrep,
+        DamageChasePrep,
+        ReturnToPatrol,
+        Prep,
+        Flame,
+        Recovery
+    }
 
     [Header("Refs")]
-    [SerializeField] private Transform sprite;           // Animator+Renderer child
-    [SerializeField] private Animator anim;             // Animator on the sprite child
-    [SerializeField] private Transform flameAreaTf;     // FlameArea transform under ROOT
-    [SerializeField] private BoxCollider2D flameArea;   // FlameArea collider (isTrigger)
-    [SerializeField] private Transform leftPoint;       // World patrol point (not a child)
-    [SerializeField] private Transform rightPoint;      // World patrol point (not a child)
+    [SerializeField] private Transform sprite;
+    [SerializeField] private Animator anim;
+    [SerializeField] private Transform flameAreaTf;
+    [SerializeField] private BoxCollider2D flameArea;
+    [SerializeField] private Collider2D bodyCollider;
+    [SerializeField] private Transform leftPoint;
+    [SerializeField] private Transform rightPoint;
+    [SerializeField] private Transform detectionOrigin;
 
     [Header("Detection (Cone)")]
     [SerializeField] private float viewDistance = 3.6f;
 
-    [Tooltip("Degrees ABOVE the horizontal baseline (0°).")]
+    [Tooltip("Degrees ABOVE the horizontal baseline (0 degrees).")]
     [SerializeField] private float upperAngle = 70f;
 
-    [Tooltip("Degrees BELOW the horizontal baseline (0°).")]
+    [Tooltip("Degrees BELOW the horizontal baseline (0 degrees).")]
     [SerializeField] private float lowerAngle = 0f;
 
+    [SerializeField] private float awarenessRadius = 4.75f;
+    [SerializeField] private float attackDistance = 2.8f;
     [SerializeField] private LayerMask playerLayer;
     [SerializeField] private LayerMask obstructionLayers;
     [SerializeField] private bool useLineOfSight = true;
@@ -28,6 +44,16 @@ public class FlameEnemyAI : MonoBehaviour
     [Header("Patrol")]
     [SerializeField] private float patrolSpeed = 2f;
     [SerializeField] private float endIdleTime = 1f;
+
+    [Header("Movement Safety")]
+    [SerializeField] private float chaseSpeed = 2.7f;
+    [SerializeField] private float chaseLeashExtra = 2f;
+    [SerializeField] private LayerMask groundLayers = 1 << 8;
+    [SerializeField] private float groundCheckForwardOffset = 0.37f;
+    [SerializeField] private float groundCheckDownDistance = 1f;
+    [SerializeField] private float groundCheckVerticalOffset = 0.08f;
+    [SerializeField] private float turnPrepTime = 0.3f;
+    [SerializeField] private float damageAggroTime = 1.5f;
 
     [Header("Attack")]
     [SerializeField] private float prepTime = 0.5f;
@@ -48,123 +74,335 @@ public class FlameEnemyAI : MonoBehaviour
     [SerializeField] private float retreatSpeed = 1.5f;
 
     private Rigidbody2D rb;
+    private Health health;
     private Transform player;
     private Health playerHealth;
 
     private State state = State.Patrol;
-    private int dir = 1; // 1 right, -1 left
-    private float timer = 0f;
-    private float damageTimer = 0f;
+    private int dir = 1;
+    private float timer;
+    private float damageTimer;
+    private float damageAggroTimer;
+    private float leftX;
+    private float rightX;
 
-    // When locking facing, we store the facing direction at the moment attack starts
     private int attackDir = 1;
-
-    // FlameArea symmetric placement reference (place it on the RIGHT in the editor)
     private Vector2 flameBaseLocalPos;
     private float flameAbsX;
     private float flameBaseY;
-
     private string currentAnim = "";
+
+    private void OnValidate()
+    {
+        viewDistance = Mathf.Max(0.05f, viewDistance);
+        awarenessRadius = Mathf.Max(awarenessRadius, viewDistance);
+        attackDistance = Mathf.Max(0.05f, attackDistance);
+        chaseSpeed = Mathf.Max(0f, chaseSpeed);
+        chaseLeashExtra = Mathf.Max(0f, chaseLeashExtra);
+        groundCheckForwardOffset = Mathf.Max(0f, groundCheckForwardOffset);
+        groundCheckDownDistance = Mathf.Max(0.05f, groundCheckDownDistance);
+        turnPrepTime = Mathf.Max(0f, turnPrepTime);
+        damageAggroTime = Mathf.Max(0f, damageAggroTime);
+    }
 
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
+        health = GetComponent<Health>();
+        bodyCollider = bodyCollider != null ? bodyCollider : GetComponent<Collider2D>();
 
-        if (!anim)
-            anim = sprite ? sprite.GetComponent<Animator>() : GetComponentInChildren<Animator>();
+        if (sprite == null)
+            sprite = transform.Find("Sprite") ?? GetComponentInChildren<SpriteRenderer>()?.transform;
 
-        if (!flameAreaTf && flameArea) flameAreaTf = flameArea.transform;
-        if (!flameArea && flameAreaTf) flameArea = flameAreaTf.GetComponent<BoxCollider2D>();
+        if (anim == null)
+            anim = sprite != null ? sprite.GetComponent<Animator>() : GetComponentInChildren<Animator>();
 
-        if (flameArea) flameArea.enabled = false;
+        if (flameAreaTf == null && flameArea != null)
+            flameAreaTf = flameArea.transform;
 
-        if (flameAreaTf)
+        if (flameArea == null && flameAreaTf != null)
+            flameArea = flameAreaTf.GetComponent<BoxCollider2D>();
+
+        if (detectionOrigin == null)
+            detectionOrigin = transform;
+
+        if (flameArea != null)
+            flameArea.enabled = false;
+
+        if (flameAreaTf != null)
         {
             flameBaseLocalPos = flameAreaTf.localPosition;
             flameAbsX = Mathf.Abs(flameBaseLocalPos.x);
             flameBaseY = flameBaseLocalPos.y;
 
-            // We move the transform, so collider offset should be zero
             if (flameArea != null)
                 flameArea.offset = Vector2.zero;
         }
 
+        CachePatrolBounds();
+        rb.bodyType = RigidbodyType2D.Kinematic;
+        rb.constraints |= RigidbodyConstraints2D.FreezeRotation;
         ApplyFacing();
+    }
+
+    private void OnEnable()
+    {
+        if (health == null)
+            health = GetComponent<Health>();
+
+        if (health != null)
+            health.OnDamaged += HandleDamaged;
+    }
+
+    private void OnDisable()
+    {
+        if (health != null)
+            health.OnDamaged -= HandleDamaged;
     }
 
     private void Update()
     {
-        if (!TryResolvePlayer() || leftPoint == null || rightPoint == null) return;
+        if (damageAggroTimer > 0f)
+            damageAggroTimer -= Time.deltaTime;
+
+        if (!TryResolvePlayer() || leftPoint == null || rightPoint == null)
+        {
+            Stop();
+            return;
+        }
 
         switch (state)
         {
-            case State.Patrol:    TickPatrol(); break;
-            case State.WaitAtEnd: TickWait();   break;
-            case State.Prep:      TickPrep();   break;
-            case State.Flame:     TickFlame();  break;
-            case State.Recovery:  TickRecovery(); break;
+            case State.Patrol:
+                TickPatrol();
+                break;
+            case State.WaitAtEnd:
+                TickWait();
+                break;
+            case State.Chase:
+                TickChase();
+                break;
+            case State.TurnPrep:
+                TickTurnPrep();
+                break;
+            case State.DamageChasePrep:
+                TickDamageChasePrep();
+                break;
+            case State.ReturnToPatrol:
+                TickReturnToPatrol();
+                break;
+            case State.Prep:
+                TickPrep();
+                break;
+            case State.Flame:
+                TickFlame();
+                break;
+            case State.Recovery:
+                TickRecovery();
+                break;
         }
     }
 
-    // ---------------- PATROL
     private void TickPatrol()
     {
-        if (CanSeePlayerCone())
+        if (CanSeePlayerCone(viewDistance))
         {
-            StartPrep();
+            StartChase();
+            return;
+        }
+
+        if (!IsInsidePatrolBounds())
+        {
+            StartReturnToPatrol();
+            return;
+        }
+
+        if (!CanMoveInDirection(dir, false))
+        {
+            StartWaitAtEnd();
             return;
         }
 
         PlayOnce("run");
-
-        float targetX = (dir == 1) ? rightPoint.position.x : leftPoint.position.x;
-
-        rb.velocity = new Vector2(dir * patrolSpeed, rb.velocity.y);
+        Move(dir, patrolSpeed);
         ApplyFacing();
 
-        if ((dir == 1 && transform.position.x >= targetX) ||
-            (dir == -1 && transform.position.x <= targetX))
+        float targetX = dir == 1 ? rightX : leftX;
+        if ((dir == 1 && transform.position.x >= targetX) || (dir == -1 && transform.position.x <= targetX))
         {
-            rb.velocity = new Vector2(0f, rb.velocity.y);
             transform.position = new Vector3(targetX, transform.position.y, transform.position.z);
-
-            state = State.WaitAtEnd;
-            timer = endIdleTime;
-
-            PlayOnce("idle");
+            StartWaitAtEnd();
         }
     }
 
     private void TickWait()
     {
-        if (CanSeePlayerCone())
+        if (CanSeePlayerCone(viewDistance))
         {
-            StartPrep();
+            StartChase();
             return;
         }
 
-        rb.velocity = new Vector2(0f, rb.velocity.y);
+        Stop();
         PlayOnce("idle");
 
         timer -= Time.deltaTime;
         if (timer <= 0f)
         {
             dir *= -1;
+            ApplyFacing();
             state = State.Patrol;
         }
     }
 
-    // ---------------- PREP
+    private void StartChase()
+    {
+        state = State.Chase;
+        FacePlayerIfAllowed();
+    }
+
+    private void TickChase()
+    {
+        if (!CanSensePlayer())
+        {
+            StartReturnToPatrol();
+            return;
+        }
+
+        if (IsPlayerBehind())
+        {
+            StartTurnPrep();
+            return;
+        }
+
+        if (CanReachPlayerForAttack())
+        {
+            StartPrep();
+            return;
+        }
+
+        if (!CanMoveInDirection(dir, true))
+        {
+            Stop();
+            PlayOnce("idle");
+            return;
+        }
+
+        PlayOnce("run");
+        Move(dir, chaseSpeed);
+        ClampToCombatBounds();
+    }
+
+    private void StartTurnPrep()
+    {
+        state = State.TurnPrep;
+        timer = turnPrepTime;
+        Stop();
+        PlayOnce("idle");
+    }
+
+    private void TickTurnPrep()
+    {
+        Stop();
+        PlayOnce("idle");
+
+        if (!CanSensePlayer())
+        {
+            StartReturnToPatrol();
+            return;
+        }
+
+        timer -= Time.deltaTime;
+        if (timer > 0f)
+            return;
+
+        FacePlayerIfAllowed();
+        state = State.Chase;
+    }
+
+    private void StartDamageChasePrep()
+    {
+        state = State.DamageChasePrep;
+        timer = turnPrepTime;
+        damageAggroTimer = damageAggroTime;
+        Stop();
+        PlayOnce("idle");
+    }
+
+    private void TickDamageChasePrep()
+    {
+        Stop();
+        PlayOnce("idle");
+
+        if (player == null)
+        {
+            StartReturnToPatrol();
+            return;
+        }
+
+        timer -= Time.deltaTime;
+        if (timer > 0f)
+            return;
+
+        FacePlayerIfAllowed();
+        damageAggroTimer = damageAggroTime;
+        state = State.Chase;
+    }
+
+    private void StartReturnToPatrol()
+    {
+        state = State.ReturnToPatrol;
+        Stop();
+    }
+
+    private void TickReturnToPatrol()
+    {
+        if (IsInsidePatrolBounds())
+        {
+            state = State.Patrol;
+            return;
+        }
+
+        float targetX = Mathf.Clamp(transform.position.x, leftX, rightX);
+        int returnDir = targetX >= transform.position.x ? 1 : -1;
+        dir = returnDir;
+        ApplyFacing();
+
+        if (!HasGroundAhead(returnDir))
+        {
+            Stop();
+            PlayOnce("idle");
+            return;
+        }
+
+        PlayOnce("run");
+        Move(returnDir, patrolSpeed);
+
+        if ((returnDir == 1 && transform.position.x >= targetX) || (returnDir == -1 && transform.position.x <= targetX))
+        {
+            transform.position = new Vector3(targetX, transform.position.y, transform.position.z);
+            Stop();
+            state = State.Patrol;
+        }
+    }
+
+    private void StartWaitAtEnd()
+    {
+        Stop();
+        state = State.WaitAtEnd;
+        timer = endIdleTime;
+        PlayOnce("idle");
+    }
+
     private void StartPrep()
     {
         state = State.Prep;
         timer = prepTime;
+        Stop();
 
-        rb.velocity = new Vector2(0f, rb.velocity.y);
-
-        // Decide attack direction once when attack begins
-        attackDir = (player.position.x >= transform.position.x) ? 1 : -1;
-        if (lockFacingDuringAttack) dir = attackDir;
+        attackDir = player.position.x >= transform.position.x ? 1 : -1;
+        if (lockFacingDuringAttack)
+            dir = attackDir;
 
         ApplyFacing();
         PlayOnce("prep attack");
@@ -172,20 +410,18 @@ public class FlameEnemyAI : MonoBehaviour
 
     private void TickPrep()
     {
-        rb.velocity = new Vector2(0f, rb.velocity.y);
+        Stop();
 
-        // While attacking, keep the same facing direction (no turning)
         if (!lockFacingDuringAttack)
-        {
-            // If not locking, still face player during prep
-            dir = (player.position.x >= transform.position.x) ? 1 : -1;
-            ApplyFacing();
-        }
+            FacePlayerIfAllowed();
+        else
+            dir = attackDir;
 
-        // If not committing, cancel when the player leaves the cone
-        if (!commitAttack && !CanSeePlayerCone())
+        ApplyFacing();
+
+        if (!commitAttack && !CanReachPlayerForAttack())
         {
-            state = State.Patrol;
+            StartChase();
             return;
         }
 
@@ -194,175 +430,215 @@ public class FlameEnemyAI : MonoBehaviour
             StartFlame();
     }
 
-    // ---------------- FLAME
     private void StartFlame()
     {
         state = State.Flame;
         timer = flameDuration;
-        damageTimer = 0f;
+        damageTimer = damageInterval;
+        Stop();
 
-        rb.velocity = new Vector2(0f, rb.velocity.y);
+        if (lockFacingDuringAttack)
+            dir = attackDir;
 
-        // Ensure we start flame with the locked direction
-        if (lockFacingDuringAttack) dir = attackDir;
         ApplyFacing();
-
         PlayOnce("flame");
-        if (flameArea) flameArea.enabled = true;
+
+        if (flameArea != null)
+            flameArea.enabled = true;
     }
 
     private void TickFlame()
     {
-        rb.velocity = new Vector2(0f, rb.velocity.y);
+        Stop();
 
-        // Do NOT turn during flame if locked
         if (!lockFacingDuringAttack)
-        {
-            dir = (player.position.x >= transform.position.x) ? 1 : -1;
-            ApplyFacing();
-        }
+            FacePlayerIfAllowed();
         else
-        {
-            // Keep consistent facing (optional safety)
             dir = attackDir;
-            ApplyFacing();
-        }
+
+        ApplyFacing();
 
         timer -= Time.deltaTime;
         if (timer <= 0f)
         {
-            if (flameArea) flameArea.enabled = false;
+            if (flameArea != null)
+                flameArea.enabled = false;
+
             state = State.Recovery;
             timer = recoveryTime;
             return;
         }
 
-        if (playerHealth == null) return;
+        if (playerHealth == null || flameArea == null)
+            return;
 
         damageTimer += Time.deltaTime;
-        if (damageTimer >= damageInterval)
-        {
-            damageTimer = 0f;
+        if (damageTimer < damageInterval)
+            return;
 
-            Collider2D hit = Physics2D.OverlapBox(
-                flameArea.bounds.center,
-                flameArea.bounds.size,
-                0f,
-                playerLayer
-            );
-
-            if (hit != null && hit.CompareTag("Player"))
-                playerHealth.TakeDamage(damage);
-        }
+        damageTimer = 0f;
+        Collider2D hit = Physics2D.OverlapBox(flameArea.bounds.center, flameArea.bounds.size, 0f, playerLayer);
+        if (hit != null && hit.CompareTag("Player"))
+            playerHealth.TakeDamage(damage);
     }
 
     private void TickRecovery()
     {
-        rb.velocity = new Vector2(0f, rb.velocity.y);
+        Stop();
 
-        if (player != null)
+        if (player != null && Mathf.Abs(player.position.x - transform.position.x) < retreatDistance)
         {
-            float distanceToPlayer = Mathf.Abs(player.position.x - transform.position.x);
-            if (distanceToPlayer < retreatDistance)
+            int retreatDir = player.position.x >= transform.position.x ? -1 : 1;
+            if (CanMoveInDirection(retreatDir, true))
             {
-                int retreatDir = player.position.x >= transform.position.x ? -1 : 1;
-                float minX = Mathf.Min(leftPoint.position.x, rightPoint.position.x);
-                float maxX = Mathf.Max(leftPoint.position.x, rightPoint.position.x);
-                float nextX = Mathf.Clamp(transform.position.x + retreatDir * retreatSpeed * Time.deltaTime, minX, maxX);
-                transform.position = new Vector3(nextX, transform.position.y, transform.position.z);
                 dir = retreatDir;
                 ApplyFacing();
+                Move(retreatDir, retreatSpeed);
+                ClampToCombatBounds();
             }
         }
 
         PlayOnce("idle");
 
         timer -= Time.deltaTime;
-        if (timer <= 0f)
-            state = State.Patrol;
+        if (timer > 0f)
+            return;
+
+        if (CanSensePlayer())
+            StartChase();
+        else
+            StartReturnToPatrol();
     }
 
-    // ---------------- Detection: ONE cone with independent upper/lower angles around horizontal baseline
-    private bool CanSeePlayerCone()
+    private bool CanSeePlayerCone(float distance)
     {
-        if (player == null) return false;
+        if (player == null)
+            return false;
 
-        Vector2 toPlayer = (Vector2)(player.position - transform.position);
+        Vector2 origin = detectionOrigin != null ? detectionOrigin.position : transform.position;
+        Vector2 toPlayer = (Vector2)player.position - origin;
         float dist = toPlayer.magnitude;
-        if (dist > viewDistance) return false;
+        if (dist <= Mathf.Epsilon || dist > distance)
+            return false;
 
         Vector2 dirToPlayer = toPlayer / dist;
+        float angle = Mathf.Atan2(dirToPlayer.y, dirToPlayer.x) * Mathf.Rad2Deg;
+        if (angle < 0f)
+            angle += 360f;
 
-        // Absolute angle in degrees [0..360)
-        float a = Mathf.Atan2(dirToPlayer.y, dirToPlayer.x) * Mathf.Rad2Deg;
-        if (a < 0f) a += 360f;
-
-        // Facing RIGHT baseline = 0°
-        // Sector: [360-lowerAngle .. 360) U [0 .. upperAngle]
-        //
-        // Facing LEFT baseline = 180°
-        // Sector: [180-upperAngle .. 180+lowerAngle]
-        bool inCone;
         float up = Mathf.Clamp(upperAngle, 0f, 179f);
         float down = Mathf.Clamp(lowerAngle, 0f, 179f);
+        bool inCone;
 
-        // Use current facing direction (dir)
         if (dir >= 0)
         {
-            float minA = 360f - down;
-            float maxA = up;
-            inCone = (a >= minA) || (a <= maxA);
+            float minAngle = 360f - down;
+            inCone = angle >= minAngle || angle <= up;
         }
         else
         {
-            float minA = 180f - up;
-            float maxA = 180f + down;
-            inCone = (a >= minA) && (a <= maxA);
+            float minAngle = 180f - up;
+            float maxAngle = 180f + down;
+            inCone = angle >= minAngle && angle <= maxAngle;
         }
 
-        if (!inCone) return false;
-
-        if (!useLineOfSight) return true;
-
-        int mask = obstructionLayers | playerLayer;
-        RaycastHit2D hit = Physics2D.Raycast(transform.position, dirToPlayer, dist, mask);
-        if (hit && !hit.collider.CompareTag("Player"))
+        if (!inCone)
             return false;
 
-        return true;
+        return HasLineOfSight(origin, dirToPlayer, dist);
     }
 
-    // ---------------- Facing / FlameArea mirroring
+    private bool CanReachPlayerForAttack()
+    {
+        return CanSeePlayerCone(Mathf.Min(viewDistance, attackDistance));
+    }
+
+    private bool CanSensePlayer()
+    {
+        if (player == null)
+            return false;
+
+        if (damageAggroTimer > 0f)
+            return true;
+
+        Vector2 origin = detectionOrigin != null ? detectionOrigin.position : transform.position;
+        Vector2 target = player.position;
+        Vector2 toPlayer = target - origin;
+        float distance = toPlayer.magnitude;
+
+        if (distance > awarenessRadius)
+            return false;
+
+        if (distance <= Mathf.Epsilon)
+            return true;
+
+        if (HasLineOfSight(origin, toPlayer / distance, distance))
+            return true;
+
+        return CanSeePlayerCone(viewDistance);
+    }
+
+    private bool HasLineOfSight(Vector2 origin, Vector2 direction, float distance)
+    {
+        if (!useLineOfSight)
+            return true;
+
+        int mask = obstructionLayers | playerLayer;
+        RaycastHit2D hit = Physics2D.Raycast(origin, direction, distance, mask);
+        return hit.collider == null || hit.collider.CompareTag("Player");
+    }
+
     private void ApplyFacing()
     {
-        // Flip sprite visually
-        if (sprite)
+        if (sprite != null)
         {
-            Vector3 s = sprite.localScale;
-            s.x = Mathf.Abs(s.x) * dir;
-            sprite.localScale = s;
+            Vector3 scale = sprite.localScale;
+            scale.x = Mathf.Abs(scale.x) * dir;
+            sprite.localScale = scale;
         }
 
-        // Keep FlameArea under ROOT, but mirror it symmetrically
-        if (flameAreaTf)
-        {
+        if (flameAreaTf != null)
             flameAreaTf.localPosition = new Vector3(flameAbsX * dir, flameBaseY, flameAreaTf.localPosition.z);
-        }
     }
 
     private void PlayOnce(string stateName)
     {
-        if (!anim) return;
-        if (currentAnim == stateName) return;
+        if (anim == null || anim.runtimeAnimatorController == null || currentAnim == stateName)
+            return;
+
         currentAnim = stateName;
         anim.Play(stateName);
     }
 
-    // Called externally when enemy takes a hit (to cancel attack/flame)
     public void InterruptForHit()
     {
-        if (flameArea) flameArea.enabled = false;
-        state = State.Patrol;
+        // FlameGuy is intentionally stubborn: this method exists for legacy callers,
+        // but hit reactions should not knock him back or cancel committed attacks.
+    }
+
+    public void AlertFromDamage()
+    {
+        if (!TryResolvePlayer())
+            return;
+
+        if (state == State.Prep || state == State.Flame)
+            return;
+
+        if (IsPlayerBehind())
+            StartDamageChasePrep();
+        else
+        {
+            damageAggroTimer = damageAggroTime;
+            StartChase();
+        }
+    }
+
+    private void HandleDamaged(float remainingHealth)
+    {
+        if (remainingHealth <= 0f)
+            return;
+
+        AlertFromDamage();
     }
 
     private bool TryResolvePlayer()
@@ -383,24 +659,128 @@ public class FlameEnemyAI : MonoBehaviour
         return player != null && playerHealth != null;
     }
 
+    private void Move(int direction, float speed)
+    {
+        rb.velocity = new Vector2(Mathf.Sign(direction) * speed, 0f);
+    }
+
+    private void Stop()
+    {
+        rb.velocity = Vector2.zero;
+    }
+
+    private bool CanMoveInDirection(int direction, bool useCombatBounds)
+    {
+        return IsWithinMovementBounds(direction, useCombatBounds) && HasGroundAhead(direction);
+    }
+
+    private bool IsWithinMovementBounds(int direction, bool useCombatBounds)
+    {
+        float minX = useCombatBounds ? leftX - chaseLeashExtra : leftX;
+        float maxX = useCombatBounds ? rightX + chaseLeashExtra : rightX;
+        float probeX = transform.position.x + Mathf.Sign(direction) * groundCheckForwardOffset;
+        return probeX >= minX && probeX <= maxX;
+    }
+
+    private bool HasGroundAhead(int direction)
+    {
+        if (groundLayers.value == 0)
+            return true;
+
+        Vector2 origin = GetGroundCheckOrigin(direction);
+        RaycastHit2D hit = Physics2D.Raycast(origin, Vector2.down, groundCheckDownDistance, groundLayers);
+        return hit.collider != null;
+    }
+
+    private Vector2 GetGroundCheckOrigin(int direction)
+    {
+        Bounds bounds = bodyCollider != null ? bodyCollider.bounds : new Bounds(transform.position, Vector3.one);
+        Vector2 foot = new Vector2(bounds.center.x, bounds.min.y + groundCheckVerticalOffset);
+        return foot + Vector2.right * Mathf.Sign(direction) * groundCheckForwardOffset;
+    }
+
+    private void CachePatrolBounds()
+    {
+        if (leftPoint == null || rightPoint == null)
+            return;
+
+        leftX = leftPoint.position.x;
+        rightX = rightPoint.position.x;
+
+        if (leftX > rightX)
+        {
+            float swap = leftX;
+            leftX = rightX;
+            rightX = swap;
+        }
+    }
+
+    private bool IsInsidePatrolBounds()
+    {
+        return transform.position.x >= leftX && transform.position.x <= rightX;
+    }
+
+    private void ClampToCombatBounds()
+    {
+        float clampedX = Mathf.Clamp(transform.position.x, leftX - chaseLeashExtra, rightX + chaseLeashExtra);
+        if (Mathf.Approximately(clampedX, transform.position.x))
+            return;
+
+        transform.position = new Vector3(clampedX, transform.position.y, transform.position.z);
+        Stop();
+    }
+
+    private bool IsPlayerBehind()
+    {
+        if (player == null)
+            return false;
+
+        float toPlayerX = player.position.x - transform.position.x;
+        if (Mathf.Approximately(toPlayerX, 0f))
+            return false;
+
+        return Mathf.Sign(toPlayerX) != dir;
+    }
+
+    private void FacePlayerIfAllowed()
+    {
+        if (player == null)
+            return;
+
+        int nextDir = player.position.x >= transform.position.x ? 1 : -1;
+        if (nextDir == dir)
+            return;
+
+        dir = nextDir;
+        ApplyFacing();
+    }
+
     private void OnDrawGizmosSelected()
     {
-        Gizmos.color = Color.yellow;
-
-        Vector3 origin = transform.position;
+        Vector3 origin = detectionOrigin != null ? detectionOrigin.position : transform.position;
         float facing = Application.isPlaying ? dir : 1f;
 
-        // Draw cone boundaries using the SAME rules as CanSeePlayerCone()
-        float upperZ = (facing >= 0f) ? +upperAngle : (180f - upperAngle);
-        float lowerZ = (facing >= 0f) ? -lowerAngle : (180f + lowerAngle);
-        float baseZ  = (facing >= 0f) ? 0f : 180f;
+        float upperZ = facing >= 0f ? upperAngle : 180f - upperAngle;
+        float lowerZ = facing >= 0f ? -lowerAngle : 180f + lowerAngle;
+        float baseZ = facing >= 0f ? 0f : 180f;
 
-        Vector3 baseDir  = Quaternion.Euler(0, 0, baseZ)  * Vector3.right;
-        Vector3 upperDir = Quaternion.Euler(0, 0, upperZ) * Vector3.right;
-        Vector3 lowerDir = Quaternion.Euler(0, 0, lowerZ) * Vector3.right;
+        Vector3 baseDir = Quaternion.Euler(0f, 0f, baseZ) * Vector3.right;
+        Vector3 upperDir = Quaternion.Euler(0f, 0f, upperZ) * Vector3.right;
+        Vector3 lowerDir = Quaternion.Euler(0f, 0f, lowerZ) * Vector3.right;
 
+        Gizmos.color = Color.yellow;
         Gizmos.DrawLine(origin, origin + baseDir * viewDistance);
         Gizmos.DrawLine(origin, origin + upperDir * viewDistance);
         Gizmos.DrawLine(origin, origin + lowerDir * viewDistance);
+
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawWireSphere(origin, awarenessRadius);
+
+        Gizmos.color = Color.red;
+        Gizmos.DrawLine(origin, origin + baseDir * attackDistance);
+
+        Gizmos.color = Color.green;
+        Vector3 groundOrigin = GetGroundCheckOrigin(Application.isPlaying ? dir : 1);
+        Gizmos.DrawLine(groundOrigin, groundOrigin + Vector3.down * groundCheckDownDistance);
     }
 }

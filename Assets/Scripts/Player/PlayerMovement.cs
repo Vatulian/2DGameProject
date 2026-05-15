@@ -72,6 +72,9 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private Transform _frontWallCheckPoint;
     [SerializeField] private Transform _backWallCheckPoint;
     [SerializeField] private Vector2 _wallCheckSize = new Vector2(0.5f, 1f);
+    [SerializeField] private string oneWayPlatformTag = "OneWayPlatform";
+    [SerializeField] private float dropThroughPlatformDuration = 0.25f;
+    [SerializeField] private float dropThroughPushSpeed = 2f;
     #endregion
 
     #region LAYERS & TAGS
@@ -84,7 +87,11 @@ public class PlayerMovement : MonoBehaviour
     private float externalRunMultiplier = 1f;
     private float forcedHorizontalVelocity;
     private float forcedHorizontalVelocityTimer;
+    private float airAttackFloatTimer;
+    private float airAttackRestartGraceTimer;
     private Health health;
+    private Collider2D[] playerColliders;
+    private Coroutine dropThroughCoroutine;
 
     #endregion
 
@@ -96,6 +103,7 @@ public class PlayerMovement : MonoBehaviour
         if (!animationController)
             animationController = gameObject.AddComponent<PlayerAnimationController>();
         health = GetComponent<Health>();
+        playerColliders = GetComponentsInChildren<Collider2D>();
 
     }
 
@@ -114,6 +122,12 @@ public class PlayerMovement : MonoBehaviour
 
         if (forcedHorizontalVelocityTimer > 0f)
             forcedHorizontalVelocityTimer -= Time.deltaTime;
+
+        if (airAttackFloatTimer > 0f)
+            airAttackFloatTimer -= Time.deltaTime;
+
+        if (airAttackRestartGraceTimer > 0f)
+            airAttackRestartGraceTimer -= Time.deltaTime;
 
         #region TIMERS
         LastOnGroundTime -= Time.deltaTime;
@@ -136,7 +150,8 @@ public class PlayerMovement : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.J))
         {
-            OnJumpInput();
+            if (!TryDropThroughPlatform())
+                OnJumpInput();
         }
 
         if (Input.GetKeyUp(KeyCode.Space) || Input.GetKeyUp(KeyCode.C) || Input.GetKeyUp(KeyCode.J))
@@ -153,11 +168,14 @@ public class PlayerMovement : MonoBehaviour
         #region COLLISION CHECKS
         if (!IsDashing)
         {
-            _isTouchingWallRight = (Physics2D.OverlapBox(_frontWallCheckPoint.position, _wallCheckSize, 0, _wallLayer) && IsFacingRight)
-                || (Physics2D.OverlapBox(_backWallCheckPoint.position, _wallCheckSize, 0, _wallLayer) && !IsFacingRight);
+            bool frontWallHit = HasWallContact(_frontWallCheckPoint.position);
+            bool backWallHit = HasWallContact(_backWallCheckPoint.position);
 
-            _isTouchingWallLeft = (Physics2D.OverlapBox(_frontWallCheckPoint.position, _wallCheckSize, 0, _wallLayer) && !IsFacingRight)
-                || (Physics2D.OverlapBox(_backWallCheckPoint.position, _wallCheckSize, 0, _wallLayer) && IsFacingRight);
+            _isTouchingWallRight = (frontWallHit && IsFacingRight)
+                || (backWallHit && !IsFacingRight);
+
+            _isTouchingWallLeft = (frontWallHit && !IsFacingRight)
+                || (backWallHit && IsFacingRight);
 
             //Ground Check
             if (Physics2D.OverlapBox(_groundCheckPoint.position, _groundCheckSize, 0, _groundLayer)) //checks if set box overlaps with ground
@@ -287,8 +305,20 @@ public class PlayerMovement : MonoBehaviour
         #region GRAVITY
         if (!_isDashAttacking)
         {
+            if (ShouldApplyAirAttackFloat())
+            {
+                SetGravityScale(Data.gravityScale * Data.airAttackGravityMult);
+                RB.velocity = new Vector2(
+                    RB.velocity.x,
+                    Mathf.Clamp(RB.velocity.y, -Data.airAttackMaxFallSpeed, Data.airAttackMaxUpwardSpeed));
+            }
+            else if (ShouldApplyAirAttackGraceFloat())
+            {
+                SetGravityScale(Data.gravityScale * Data.airAttackGraceGravityMult);
+                RB.velocity = new Vector2(RB.velocity.x, Mathf.Max(RB.velocity.y, -Data.airAttackGraceMaxFallSpeed));
+            }
             //Higher gravity if we've released the jump input or are falling
-            if (IsSliding)
+            else if (IsSliding)
             {
                 SetGravityScale(0);
             }
@@ -673,6 +703,102 @@ public class PlayerMovement : MonoBehaviour
         else
             return false;
     }
+
+    private bool HasWallContact(Vector2 checkPosition)
+    {
+        Collider2D[] hits = Physics2D.OverlapBoxAll(checkPosition, _wallCheckSize, 0, _wallLayer);
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider2D hit = hits[i];
+            if (hit != null && !ShouldIgnoreWallContact(hit))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool ShouldIgnoreWallContact(Collider2D hit)
+    {
+        if (hit.attachedRigidbody == RB || hit.transform.IsChildOf(transform))
+            return true;
+
+        return IsDropThroughPlatform(hit);
+    }
+
+    private bool TryDropThroughPlatform()
+    {
+        if (!IsPressingDown() || _groundCheckPoint == null)
+            return false;
+
+        Collider2D platform = FindDropThroughPlatformBelow();
+        if (platform == null)
+            return false;
+
+        if (dropThroughCoroutine != null)
+            StopCoroutine(dropThroughCoroutine);
+
+        dropThroughCoroutine = StartCoroutine(DisablePlatformCollision(platform));
+        LastPressedJumpTime = 0f;
+        LastOnGroundTime = 0f;
+        RB.velocity = new Vector2(RB.velocity.x, Mathf.Min(RB.velocity.y, -dropThroughPushSpeed));
+        return true;
+    }
+
+    private Collider2D FindDropThroughPlatformBelow()
+    {
+        Collider2D[] hits = Physics2D.OverlapBoxAll(_groundCheckPoint.position, _groundCheckSize, 0, _groundLayer);
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider2D hit = hits[i];
+            if (hit != null && IsDropThroughPlatform(hit))
+                return hit;
+        }
+
+        return null;
+    }
+
+    private bool IsDropThroughPlatform(Collider2D hit)
+    {
+        if (hit == null)
+            return false;
+
+        if (!string.IsNullOrEmpty(oneWayPlatformTag) && hit.gameObject.tag == oneWayPlatformTag)
+            return true;
+
+        return hit.GetComponent<PlatformEffector2D>() != null
+            || hit.GetComponentInParent<PlatformEffector2D>() != null;
+    }
+
+    private bool IsPressingDown()
+    {
+        return _moveInput.y < -0.5f || Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow);
+    }
+
+    private IEnumerator DisablePlatformCollision(Collider2D platform)
+    {
+        if (playerColliders == null || playerColliders.Length == 0)
+            playerColliders = GetComponentsInChildren<Collider2D>();
+
+        SetPlatformCollisionIgnored(platform, true);
+        yield return new WaitForSeconds(dropThroughPlatformDuration);
+        SetPlatformCollisionIgnored(platform, false);
+        dropThroughCoroutine = null;
+    }
+
+    private void SetPlatformCollisionIgnored(Collider2D platform, bool ignored)
+    {
+        if (platform == null || playerColliders == null)
+            return;
+
+        for (int i = 0; i < playerColliders.Length; i++)
+        {
+            Collider2D playerCollider = playerColliders[i];
+            if (playerCollider != null && playerCollider.enabled && !playerCollider.isTrigger)
+                Physics2D.IgnoreCollision(playerCollider, platform, ignored);
+        }
+    }
     #endregion
 
 
@@ -713,6 +839,69 @@ public class PlayerMovement : MonoBehaviour
     {
         forcedHorizontalVelocity = 0f;
         forcedHorizontalVelocityTimer = 0f;
+    }
+
+    public bool IsGrounded()
+    {
+        return LastOnGroundTime > 0f;
+    }
+
+    public bool IsAirborne()
+    {
+        return LastOnGroundTime <= 0f && !IsDashing && !IsSliding;
+    }
+
+    public void ApplyAirAttackFloat()
+    {
+        if (Data == null || !Data.enableAirAttackFloat || !IsAirborne())
+            return;
+
+        airAttackRestartGraceTimer = 0f;
+        airAttackFloatTimer = Mathf.Max(airAttackFloatTimer, Data.airAttackFloatDuration);
+
+        float verticalVelocity = Mathf.Min(RB.velocity.y, Data.airAttackMaxUpwardSpeed);
+        verticalVelocity = Mathf.Max(verticalVelocity, -Data.airAttackStartFallSpeed);
+        RB.velocity = new Vector2(RB.velocity.x, verticalVelocity);
+    }
+
+    public void ClearAirAttackFloat()
+    {
+        ClearAirAttackFloat(false);
+    }
+
+    public void ClearAirAttackFloat(bool allowRestartGrace)
+    {
+        airAttackFloatTimer = 0f;
+
+        if (allowRestartGrace && Data != null && Data.enableAirAttackFloat && IsAirborne())
+            airAttackRestartGraceTimer = Data.airAttackRestartGraceTime;
+        else
+            airAttackRestartGraceTimer = 0f;
+    }
+
+    public bool IsInAirAttackRestartGrace()
+    {
+        return airAttackRestartGraceTimer > 0f && IsAirborne();
+    }
+
+    private bool ShouldApplyAirAttackFloat()
+    {
+        return Data != null
+            && Data.enableAirAttackFloat
+            && airAttackFloatTimer > 0f
+            && LastOnGroundTime <= 0f
+            && !IsSliding
+            && !IsDashing;
+    }
+
+    private bool ShouldApplyAirAttackGraceFloat()
+    {
+        return Data != null
+            && Data.enableAirAttackFloat
+            && airAttackRestartGraceTimer > 0f
+            && LastOnGroundTime <= 0f
+            && !IsSliding
+            && !IsDashing;
     }
 
     public bool WasJumpPressedThisFrame()

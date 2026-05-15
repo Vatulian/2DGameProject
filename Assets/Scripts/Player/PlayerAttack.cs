@@ -7,6 +7,7 @@ public class PlayerAttack : MonoBehaviour
     [SerializeField] private Transform firePoint;
     [SerializeField] private GameObject[] fireballs;
     [SerializeField] private AudioClip fireballSound;
+    [SerializeField] private KeyCode attackKey = KeyCode.F;
 
     private PlayerAnimationController animationController;
     private Animator anim;
@@ -35,7 +36,7 @@ public class PlayerAttack : MonoBehaviour
         if (health != null && health.IsDead)
             return;
 
-        if (Input.GetMouseButtonDown(0)
+        if (Input.GetKeyDown(attackKey)
             && cooldownTimer <= 0f
             && playerMovement != null
             && playerMovement.canAttack()
