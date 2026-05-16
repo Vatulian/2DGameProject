@@ -119,7 +119,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 89bdab6170324a569047a4f8d8f66d86, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  ai: {fileID: 3486712907266971868}
+  ai: {fileID: 0}
   attack: {fileID: 2320664821550403945}
   damageReaction: {fileID: 5391727816620822111}
 --- !u!1 &1081627181722894445
@@ -146,7 +146,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1081627181722894445}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -2.14, y: 7.2, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -271,6 +271,9 @@ MonoBehaviour:
   startingHealth: 5
   iFramesDuration: 0
   numberOfFlashes: 0
+  playerKnockbackSpeed: 9
+  playerKnockbackDuration: 0.18
+  playerKnockbackUpwardVelocity: 2.5
   components:
   - {fileID: 8989325380587184408}
   - {fileID: 2320664821550403945}
@@ -295,23 +298,23 @@ MonoBehaviour:
   rightPoint: {fileID: 5983014857251320426}
   detectionOrigin: {fileID: 0}
   attack: {fileID: 2320664821550403945}
-  patrolSpeed: 2
+  patrolSpeed: 3.5
   turnPause: 0.35
-  chaseLeashExtra: 2
+  chaseLeashExtra: 3
   groundLayers:
     serializedVersion: 2
     m_Bits: 256
   groundCheckForwardOffset: 0.37
   groundCheckDownDistance: 1
   groundCheckVerticalOffset: 0.08
-  detectionDistance: 4
-  awarenessRadius: 4.75
+  detectionDistance: 8.25
+  awarenessRadius: 9
   awarenessPadding: 0.75
-  attackDistance: 1.4
-  chaseSpeed: 4
-  lostPlayerSpeed: 1.8
+  attackDistance: 5
+  chaseSpeed: 6
+  lostPlayerSpeed: 2
   lostPlayerWaitTime: 1.2
-  turnPrepTime: 0.3
+  turnPrepTime: 0.2
   playerLayer:
     serializedVersion: 2
     m_Bits: 1024
@@ -319,12 +322,12 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 256
   attackCooldown: 1.1
-  attackPrepTime: 0.15
-  attackStateDuration: 1.35
-  attackRecoveryTime: 0.3
-  parriedStunTime: 1
-  attackDashDistance: 1.75
-  attackDashDuration: 0.18
+  attackPrepTime: 0.1
+  attackStateDuration: 0.9
+  attackRecoveryTime: 0.25
+  parriedStunTime: 1.2
+  attackDashDistance: 3
+  attackDashDuration: 0.25
   attackDashCurve:
     serializedVersion: 2
     m_Curve:
@@ -351,7 +354,7 @@ MonoBehaviour:
     m_RotationOrder: 4
   idleStateName: idle
   runStateName: run
-  attackStateName: dash attack_1
+  attackStateName: double slash
   parriedStateName: hit
 --- !u!114 &5391727816620822111
 MonoBehaviour:
@@ -453,12 +456,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   attackCollider: {fileID: 4830857348903525135}
-  hitboxSize: {x: 1, y: 1}
-  rightFacingOffset: {x: 0.91, y: 0}
+  hitboxSize: {x: 1.74, y: 1.69}
+  rightFacingOffset: {x: 1.23, y: 0.24}
   damage: 1
   playerLayer:
     serializedVersion: 2
     m_Bits: 1024
+  applyKnockback: 1
   canBeParried: 1
 --- !u!61 &4830857348903525135
 BoxCollider2D:
@@ -492,7 +496,7 @@ BoxCollider2D:
   m_IsTrigger: 1
   m_UsedByEffector: 0
   m_UsedByComposite: 0
-  m_Offset: {x: 0.91, y: 0}
+  m_Offset: {x: 1.23, y: 0.24}
   m_SpriteTilingProperty:
     border: {x: 0, y: 0, z: 0, w: 0}
     pivot: {x: 0, y: 0}
@@ -503,7 +507,7 @@ BoxCollider2D:
     adaptiveTiling: 0
   m_AutoTiling: 0
   serializedVersion: 2
-  m_Size: {x: 1, y: 1}
+  m_Size: {x: 1.74, y: 1.69}
   m_EdgeRadius: 0
 --- !u!1 &7754626925023006514
 GameObject:

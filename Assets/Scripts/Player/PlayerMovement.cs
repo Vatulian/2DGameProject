@@ -294,12 +294,7 @@ public class PlayerMovement : MonoBehaviour
         #endregion
 
         #region SLIDE CHECKS
-        //Artık wall slide için duvara doğru input gerekmiyor.
-        //Duvara havadayken temas ettiğinde otomatik cling/slide başlar.
-        if (CanSlide())
-            IsSliding = true;
-        else
-            IsSliding = false;
+        IsSliding = CanSlide();
         #endregion
 
         #region GRAVITY
@@ -688,7 +683,7 @@ public class PlayerMovement : MonoBehaviour
 
     private bool CanDash()
     {
-        if (!IsDashing && _dashesLeft < Data.dashAmount && LastOnGroundTime > 0 && !_dashRefilling)
+        if (!IsDashing && _dashesLeft < Data.dashAmount && CanRefillDash() && !_dashRefilling)
         {
             StartCoroutine(nameof(RefillDash), 1);
         }
@@ -696,12 +691,48 @@ public class PlayerMovement : MonoBehaviour
         return _dashesLeft > 0;
     }
 
+    private bool CanRefillDash()
+    {
+        return LastOnGroundTime > 0 || CanRefillDashFromWall();
+    }
+
+    private bool CanRefillDashFromWall()
+    {
+        return LastOnWallTime > 0
+            && LastOnGroundTime <= 0
+            && !IsWallJumping
+            && IsPressingIntoWall();
+    }
+
     public bool CanSlide()
     {
-        if (LastOnWallTime > 0 && !IsJumping && !IsWallJumping && !IsDashing && LastOnGroundTime <= 0)
-            return true;
-        else
+        return LastOnWallTime > 0
+            && IsPressingIntoWall()
+            && !IsJumping
+            && !IsWallJumping
+            && !IsDashing
+            && LastOnGroundTime <= 0;
+    }
+
+    private bool IsPressingIntoWall()
+    {
+        int wallDirection = GetCurrentWallDirection();
+
+        if (wallDirection == 0)
             return false;
+
+        return Mathf.Sign(_moveInput.x) == wallDirection && Mathf.Abs(_moveInput.x) > 0.1f;
+    }
+
+    private int GetCurrentWallDirection()
+    {
+        if (_isTouchingWallRight || LastOnWallRightTime > 0)
+            return 1;
+
+        if (_isTouchingWallLeft || LastOnWallLeftTime > 0)
+            return -1;
+
+        return 0;
     }
 
     private bool HasWallContact(Vector2 checkPosition)
