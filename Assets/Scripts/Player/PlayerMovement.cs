@@ -835,6 +835,27 @@ public class PlayerMovement : MonoBehaviour
         forcedHorizontalVelocityTimer = Mathf.Max(0f, duration);
     }
 
+    public void ApplyKnockbackFrom(Vector3 sourcePosition, float horizontalSpeed, float duration, float upwardVelocity)
+    {
+        if (health != null && health.IsDead)
+            return;
+
+        if (IsDashing)
+        {
+            StopCoroutine(nameof(StartDash));
+            health?.SetEnemyCollisionIgnored(false);
+            IsDashing = false;
+            _isDashAttacking = false;
+            SetGravityScale(Data.gravityScale);
+        }
+
+        float direction = transform.position.x >= sourcePosition.x ? 1f : -1f;
+        ForceHorizontalVelocity(direction * Mathf.Abs(horizontalSpeed), duration);
+
+        if (RB != null)
+            RB.velocity = new Vector2(RB.velocity.x, Mathf.Max(RB.velocity.y, upwardVelocity));
+    }
+
     public void ClearForcedHorizontalVelocity()
     {
         forcedHorizontalVelocity = 0f;

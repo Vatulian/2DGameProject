@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
@@ -53,9 +54,14 @@ public class BloodKnightAI : MonoBehaviour
     [Header("Attack Flow")]
     [SerializeField] private float attackCooldown = 1f;
     [SerializeField] private float attackPrepTime = 0.25f;
-    [SerializeField] private float attackStateDuration = 0.65f;
+    [SerializeField] private float attackStateDuration = 1.35f;
     [SerializeField] private float attackRecoveryTime = 0.35f;
     [SerializeField] private float parriedStunTime = 0.7f;
+
+    [Header("Attack Dash")]
+    [SerializeField] private float attackDashDistance = 0.75f;
+    [SerializeField] private float attackDashDuration = 0.16f;
+    [SerializeField] private AnimationCurve attackDashCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
     [Header("Animation States")]
     [SerializeField] private string idleStateName = "idle";
@@ -74,6 +80,7 @@ public class BloodKnightAI : MonoBehaviour
     private bool waitingAtLostPosition;
     private Vector3 lastKnownPlayerPos;
     private string currentAnim = "";
+    private Coroutine attackDashRoutine;
 
     public int Facing => facing;
 
@@ -239,7 +246,7 @@ public class BloodKnightAI : MonoBehaviour
             return;
         }
 
-        if (cooldownTimer >= attackCooldown && CanReachPlayerWithAttackRay())
+        if (cooldownTimer >= attackCooldown && CanReachPlayerWithAttackRay() && CanAttackActuallyReachPlayer())
         {
             StartAttackPrep();
             return;
@@ -475,12 +482,6 @@ public class BloodKnightAI : MonoBehaviour
 
         lastKnownPlayerPos = player.position;
 
-        if (!CanReachPlayerWithAttackRay())
-        {
-            state = State.Chase;
-            return;
-        }
-
         timer -= Time.deltaTime;
         if (timer <= 0f)
             StartAttack();
@@ -491,6 +492,7 @@ public class BloodKnightAI : MonoBehaviour
         if (attack == null)
             return;
 
+        StopAttackDash();
         state = State.Attack;
         timer = attackStateDuration;
         cooldownTimer = 0f;
@@ -514,6 +516,7 @@ public class BloodKnightAI : MonoBehaviour
             return;
 
         attack?.DisableHitbox();
+        StopAttackDash();
         StartAttackRecovery();
     }
 
@@ -547,6 +550,7 @@ public class BloodKnightAI : MonoBehaviour
         waitingAtTurn = false;
         currentAnim = "";
         Stop();
+        StopAttackDash();
         attack?.DisableHitbox();
     }
 
@@ -566,6 +570,7 @@ public class BloodKnightAI : MonoBehaviour
     {
         state = State.Parried;
         timer = parriedStunTime;
+        StopAttackDash();
         Stop();
         Play(parriedStateName);
     }
@@ -586,6 +591,59 @@ public class BloodKnightAI : MonoBehaviour
         timer = turnPause;
     }
 
+    public void BeginAttackDash()
+    {
+        if (state != State.Attack || attackDashDistance <= 0f || attackDashDuration <= 0f)
+            return;
+
+        StopAttackDash();
+        attackDashRoutine = StartCoroutine(DashForward(attackDashDistance, attackDashDuration));
+    }
+
+    public void EndAttackDash()
+    {
+        StopAttackDash();
+    }
+
+    public void FinishAttackFromAnimation()
+    {
+        if (state != State.Attack)
+            return;
+
+        attack?.DisableHitbox();
+        StopAttackDash();
+        StartAttackRecovery();
+    }
+
+    private IEnumerator DashForward(float distance, float duration)
+    {
+        Vector3 start = transform.position;
+        Vector3 target = start + Vector3.right * facing * distance;
+        target = ClampPositionToPatrolBounds(target);
+
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.deltaTime;
+            float normalizedTime = Mathf.Clamp01(elapsed / duration);
+            float t = attackDashCurve != null ? attackDashCurve.Evaluate(normalizedTime) : normalizedTime;
+            transform.position = Vector3.Lerp(start, target, t);
+            yield return null;
+        }
+
+        transform.position = target;
+        attackDashRoutine = null;
+    }
+
+    private void StopAttackDash()
+    {
+        if (attackDashRoutine == null)
+            return;
+
+        StopCoroutine(attackDashRoutine);
+        attackDashRoutine = null;
+    }
+
     private bool CanDetectPlayerAhead()
     {
         Vector2 origin = detectionOrigin != null ? detectionOrigin.position : transform.position;
@@ -604,6 +662,28 @@ public class BloodKnightAI : MonoBehaviour
 
         RaycastHit2D hit = Physics2D.Raycast(origin, direction, attackDistance, mask);
         return hit.collider != null && hit.collider.CompareTag("Player");
+    }
+
+    private bool CanAttackActuallyReachPlayer()
+    {
+        Transform player = GetPlayerTransform();
+        if (player == null || attack == null)
+            return false;
+
+        float toPlayerX = player.position.x - transform.position.x;
+        if (Mathf.Approximately(toPlayerX, 0f))
+            return true;
+
+        if (Mathf.Sign(toPlayerX) != facing)
+            return false;
+
+        Vector3 dashTarget = transform.position + Vector3.right * facing * attackDashDistance;
+        dashTarget = ClampPositionToPatrolBounds(dashTarget);
+
+        float effectiveDashDistance = Mathf.Abs(dashTarget.x - transform.position.x);
+        float effectiveReach = effectiveDashDistance + attack.ForwardReach;
+
+        return Mathf.Abs(toPlayerX) <= effectiveReach;
     }
 
     private bool CanSensePlayerInAwareness(Transform player)

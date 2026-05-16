@@ -24,6 +24,11 @@ public class Health : MonoBehaviour
     [SerializeField] private int numberOfFlashes;
     private SpriteRenderer spriteRend;
 
+    [Header("Player Knockback")]
+    [SerializeField] private float playerKnockbackSpeed = 9f;
+    [SerializeField] private float playerKnockbackDuration = 0.18f;
+    [SerializeField] private float playerKnockbackUpwardVelocity = 2.5f;
+
     [Header("Components")]
     [SerializeField] private Behaviour[] components;
     private bool invulnerable;
@@ -56,15 +61,29 @@ public class Health : MonoBehaviour
 
     public void TakeDamage(float _damage)
     {
+        TakeDamage(_damage, null);
+    }
+
+    public void TakeDamage(float _damage, Vector3 knockbackSource)
+    {
+        TakeDamage(_damage, (Vector3?)knockbackSource);
+    }
+
+    private void TakeDamage(float _damage, Vector3? knockbackSource)
+    {
         if (invulnerable || dead) return;
         currentHealth = Mathf.Clamp(currentHealth - _damage, 0, startingHealth);
         OnDamaged?.Invoke(currentHealth);
 
         if (currentHealth > 0)
         {
+            ApplyPlayerKnockback(knockbackSource);
+
             if (OnDamaged == null && anim != null)
                 anim.SetTrigger("Hurt");
+            /*
             StartCoroutine(Invunerability());
+            */
             if (hurtSound != null)
                 SoundManager.instance.PlaySound(hurtSound);
         }
@@ -101,6 +120,32 @@ public class Health : MonoBehaviour
                     SoundManager.instance.PlaySound(deathSound);
             }
         }
+    }
+
+    private void ApplyPlayerKnockback(Vector3? knockbackSource)
+    {
+        if (!isPlayerCharacter || knockbackSource == null)
+            return;
+
+        PlayerMovement movement = GetComponent<PlayerMovement>();
+        if (movement != null)
+        {
+            movement.ApplyKnockbackFrom(
+                knockbackSource.Value,
+                playerKnockbackSpeed,
+                playerKnockbackDuration,
+                playerKnockbackUpwardVelocity);
+            return;
+        }
+
+        if (rb == null)
+            rb = GetComponent<Rigidbody2D>();
+
+        if (rb == null)
+            return;
+
+        float direction = transform.position.x >= knockbackSource.Value.x ? 1f : -1f;
+        rb.velocity = new Vector2(direction * playerKnockbackSpeed, Mathf.Max(rb.velocity.y, playerKnockbackUpwardVelocity));
     }
 
     public void AddHealth(float _value)

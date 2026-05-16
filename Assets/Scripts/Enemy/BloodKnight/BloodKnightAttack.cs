@@ -13,6 +13,7 @@ public class BloodKnightAttack : MonoBehaviour
     [Header("Damage")]
     [SerializeField] private int damage = 1;
     [SerializeField] private LayerMask playerLayer;
+    [SerializeField] private bool applyKnockback = true;
 
     [Header("Parry")]
     [SerializeField] private bool canBeParried = true;
@@ -24,6 +25,7 @@ public class BloodKnightAttack : MonoBehaviour
     private bool active;
 
     public bool WasParried { get; private set; }
+    public float ForwardReach => Mathf.Abs(rightFacingOffset.x) + hitboxSize.x * 0.5f;
 
     private void Awake()
     {
@@ -100,7 +102,10 @@ public class BloodKnightAttack : MonoBehaviour
             return;
 
         hitTargets.Add(other);
-        health.TakeDamage(damage);
+        if (applyKnockback)
+            health.TakeDamage(damage, owner != null ? owner.position : transform.position);
+        else
+            health.TakeDamage(damage);
     }
 
     private bool TryParry(Collider2D playerHit)
