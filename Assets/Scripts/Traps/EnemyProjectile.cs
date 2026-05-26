@@ -2,9 +2,21 @@ using UnityEngine;
 
 public class EnemyProjectile : EnemyDamage
 {
+    private const string EnemyAttackLayerName = "EnemyAttack";
+
     [SerializeField] private float speed;
     [SerializeField] private float resetTime;
     private float lifetime;
+
+    private void Awake()
+    {
+        ApplyEnemyAttackLayer();
+    }
+
+    private void OnValidate()
+    {
+        ApplyEnemyAttackLayer();
+    }
 
     public void ActivateProjectile()
     {
@@ -21,9 +33,16 @@ public class EnemyProjectile : EnemyDamage
             gameObject.SetActive(false);
     }
 
-    private void OnTriggerEnter2D(Collider2D collision)
+    private new void OnTriggerEnter2D(Collider2D collision)
     {
         base.OnTriggerEnter2D(collision); //Execute logic from parent script first
         gameObject.SetActive(false); //When this hits any object deactivate arrow
+    }
+
+    private void ApplyEnemyAttackLayer()
+    {
+        int enemyAttackLayer = LayerMask.NameToLayer(EnemyAttackLayerName);
+        if (enemyAttackLayer >= 0 && gameObject.layer != enemyAttackLayer)
+            gameObject.layer = enemyAttackLayer;
     }
 }

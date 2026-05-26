@@ -1,7 +1,8 @@
 using UnityEngine;
 using UnityEngine.UI;
+using System;
 
-public class Boss : MonoBehaviour
+public class Boss : MonoBehaviour, IBossEncounterTarget
 {
     private Vector3 spawnPosition;
     private bool spawnPositionInitialized;
@@ -20,12 +21,17 @@ public class Boss : MonoBehaviour
     private Animator anim;
     private HitFlash hitFlash;
     private BossHitVFX hitVfx;
+    private BossDamageFeedback damageFeedback;
 
     public bool isDead;
     private bool stageTwoTriggered;
+    public event Action Defeated;
+
+    public bool IsEncounterDefeated => isDead;
 
     [Header("Door On Death")]
     [SerializeField] private DoorController doorOnDeath;
+    [SerializeField] private ActivationTarget[] additionalDeathTargets;
 
     [Header("Arena Walls")]
     [SerializeField] private GameObject arenaWalls;
@@ -36,6 +42,7 @@ public class Boss : MonoBehaviour
         anim = GetComponent<Animator>();
         hitFlash = GetComponent<HitFlash>();
         hitVfx = GetComponent<BossHitVFX>();
+        damageFeedback = GetComponent<BossDamageFeedback>();
 
         timeBtwDamage = 0f;
 
@@ -95,8 +102,15 @@ public class Boss : MonoBehaviour
         if (healthBar != null)
             healthBar.value = health;
 
-        hitFlash?.Play();
-        hitVfx?.PlayAt(hitPos);
+        if (damageFeedback != null)
+        {
+            damageFeedback.PlayAt(hitPos);
+        }
+        else
+        {
+            hitFlash?.Play();
+            hitVfx?.PlayAt(hitPos);
+        }
 
         if (!stageTwoTriggered && health <= 10)
         {
@@ -123,7 +137,9 @@ public class Boss : MonoBehaviour
             arenaWalls.SetActive(false);
 
         if (doorOnDeath != null)
-            doorOnDeath.OpenDoor();
+            doorOnDeath.Activate(gameObject);
+
+        InvokeActivationTargets(additionalDeathTargets);
 
         if (LevelFlow.Instance != null)
         {
@@ -137,6 +153,8 @@ public class Boss : MonoBehaviour
         CameraController cam = FindObjectOfType<CameraController>();
         if (cam != null)
             cam.Unlock();
+
+        Defeated?.Invoke();
     }
 
     public void ResetBoss()
@@ -169,6 +187,26 @@ public class Boss : MonoBehaviour
         spawnPositionInitialized = true;
     }
 
+    public void SetEncounterSpawnPosition(Vector3 position)
+    {
+        SetSpawnPosition(position);
+    }
+
+    public void ActivateEncounter()
+    {
+        gameObject.SetActive(true);
+    }
+
+    public void DeactivateEncounter()
+    {
+        gameObject.SetActive(false);
+    }
+
+    public void ResetEncounter()
+    {
+        ResetBoss();
+    }
+
     private void CacheSpawnPositionIfNeeded()
     {
         if (spawnPositionInitialized)
@@ -176,5 +214,14 @@ public class Boss : MonoBehaviour
 
         spawnPosition = transform.position;
         spawnPositionInitialized = true;
+    }
+
+    private void InvokeActivationTargets(ActivationTarget[] targets)
+    {
+        if (targets == null)
+            return;
+
+        for (int i = 0; i < targets.Length; i++)
+            targets[i]?.Invoke(gameObject);
     }
 }

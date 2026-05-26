@@ -6,8 +6,9 @@ public class PlayerInventory : MonoBehaviour
 {
     private readonly Dictionary<KeyItem, int> keyCounts = new();
     public event Action OnChanged;
+    public IEnumerable<KeyValuePair<KeyItem, int>> KeyCounts => keyCounts;
 
-    public int GetCount(KeyItem key) => (key != null && keyCounts.TryGetValue(key, out var c)) ? c : 0;
+    public int GetCount(KeyItem key) => key != null && keyCounts.TryGetValue(key, out int count) ? count : 0;
     public bool HasKey(KeyItem key, int required = 1) => GetCount(key) >= required;
 
     public void AddKey(KeyItem key, int amount = 1)
@@ -19,7 +20,7 @@ public class PlayerInventory : MonoBehaviour
         }
 
         keyCounts[key] = GetCount(key) + amount;
-        Debug.Log($"[Inventory] Key ADDED → {key.name} | Count = {keyCounts[key]}");
+        Debug.Log($"[Inventory] Key ADDED -> {key.name} | Count = {keyCounts[key]}");
         OnChanged?.Invoke();
     }
 
@@ -33,20 +34,24 @@ public class PlayerInventory : MonoBehaviour
 
         if (!HasKey(key, amount))
         {
-            Debug.Log($"[Inventory] NOT enough key → {key.name} | Have={GetCount(key)} Need={amount}");
+            Debug.Log($"[Inventory] NOT enough key -> {key.name} | Have={GetCount(key)} Need={amount}");
             return false;
         }
 
-        keyCounts[key] = GetCount(key) - amount;
-        Debug.Log($"[Inventory] Key USED → {key.name} | Remaining = {keyCounts[key]}");
+        int remaining = GetCount(key) - amount;
+        if (remaining > 0)
+            keyCounts[key] = remaining;
+        else
+            keyCounts.Remove(key);
+
+        Debug.Log($"[Inventory] Key USED -> {key.name} | Remaining = {remaining}");
         OnChanged?.Invoke();
         return true;
     }
 
-    // Debug helper (optional)
     public void DebugPrintAllKeys()
     {
         foreach (var kvp in keyCounts)
-            Debug.Log($"[Inventory] KEY LIST → {kvp.Key.name} = {kvp.Value}");
+            Debug.Log($"[Inventory] KEY LIST -> {kvp.Key.name} = {kvp.Value}");
     }
 }

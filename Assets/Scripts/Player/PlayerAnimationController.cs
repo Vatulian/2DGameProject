@@ -1,10 +1,11 @@
 using UnityEngine;
 
-[RequireComponent(typeof(Animator))]
+[DefaultExecutionOrder(50)]
 public class PlayerAnimationController : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private Animator anim;
+    [SerializeField] private Transform visualRoot;
     [SerializeField] private Rigidbody2D rb;
     [SerializeField] private PlayerMovement movement;
     [SerializeField] private PlayerMeleeAttack meleeAttack;
@@ -28,23 +29,27 @@ public class PlayerAnimationController : MonoBehaviour
     private static readonly int HurtHash = Animator.StringToHash("Hurt");
     private static readonly int DieHash = Animator.StringToHash("Die");
     private float defaultAnimatorSpeed = 1f;
+    private float defaultVisualScaleX = 1f;
     private string currentLocomotionStateName;
     private float locomotionLockedUntil;
 
     private void Awake()
     {
-        if (!anim) anim = GetComponent<Animator>();
-        if (!rb) rb = GetComponent<Rigidbody2D>();
-        if (!movement) movement = GetComponent<PlayerMovement>();
-        if (!meleeAttack) meleeAttack = GetComponent<PlayerMeleeAttack>();
-        if (!health) health = GetComponent<Health>();
+        if (!anim) anim = GetComponent<Animator>() ?? GetComponentInChildren<Animator>() ?? GetComponentInParent<Animator>();
+        if (!visualRoot) visualRoot = anim != null ? anim.transform : transform;
+        if (!rb) rb = GetComponentInParent<Rigidbody2D>();
+        if (!movement) movement = GetComponentInParent<PlayerMovement>();
+        if (!meleeAttack) meleeAttack = GetComponentInParent<PlayerMeleeAttack>();
+        if (!health) health = GetComponentInParent<Health>();
         if (anim) defaultAnimatorSpeed = anim.speed;
+        if (visualRoot) defaultVisualScaleX = Mathf.Abs(visualRoot.localScale.x);
+        if (Mathf.Approximately(defaultVisualScaleX, 0f)) defaultVisualScaleX = 1f;
     }
 
     private void OnEnable()
     {
         if (health == null)
-            health = GetComponent<Health>();
+            health = GetComponentInParent<Health>();
 
         if (health == null)
             return;
@@ -71,6 +76,14 @@ public class PlayerAnimationController : MonoBehaviour
 
         if (health != null && health.IsDead)
             return;
+
+        if (movement.IsClimbing)
+        {
+            ClearAirborneTriggers();
+            anim.SetBool(RunHash, false);
+            anim.SetBool(GroundedHash, true);
+            return;
+        }
 
         bool isRunning = Mathf.Abs(rb != null ? rb.velocity.x : 0f) > runVelocityThreshold;
         bool isGrounded = IsGroundedForAnimation();
@@ -118,9 +131,24 @@ public class PlayerAnimationController : MonoBehaviour
 
         anim.ResetTrigger(HurtHash);
         anim.ResetTrigger(DieHash);
+        ClearAirborneTriggers();
         LockLocomotion(lockDuration);
         currentLocomotionStateName = null;
         anim.CrossFadeInFixedTime(stateName, Mathf.Clamp(transitionDuration, 0f, 0.12f));
+    }
+
+    public void PlayLockedStateImmediate(string stateName, float lockDuration)
+    {
+        if (!anim || string.IsNullOrWhiteSpace(stateName))
+            return;
+
+        anim.ResetTrigger(HurtHash);
+        anim.ResetTrigger(DieHash);
+        ClearAirborneTriggers();
+        LockLocomotion(lockDuration);
+        currentLocomotionStateName = null;
+        anim.Play(stateName, 0, 0f);
+        anim.Update(0f);
     }
 
     public void PlayHurt()
@@ -177,6 +205,27 @@ public class PlayerAnimationController : MonoBehaviour
         CrossFadeLocomotionState(stateName, transitionDuration, true);
     }
 
+    public void ReturnToIdleState(float transitionDuration = 0.05f)
+    {
+        if (!anim || !anim.isActiveAndEnabled || !gameObject.activeInHierarchy)
+            return;
+
+        locomotionLockedUntil = 0f;
+        CrossFadeLocomotionState(idleStateName, transitionDuration, true);
+    }
+
+    public void ReturnToIdleAfterClimb(float transitionDuration = 0.05f)
+    {
+        if (!anim || !anim.isActiveAndEnabled || !gameObject.activeInHierarchy)
+            return;
+
+        ClearAirborneTriggers();
+        anim.SetBool(RunHash, false);
+        anim.SetBool(GroundedHash, true);
+        locomotionLockedUntil = 0f;
+        CrossFadeLocomotionState(idleStateName, transitionDuration, true);
+    }
+
     public void SetAnimatorSpeed(float speed)
     {
         if (!anim)
@@ -191,6 +240,20 @@ public class PlayerAnimationController : MonoBehaviour
             return;
 
         anim.speed = defaultAnimatorSpeed;
+    }
+
+    public void SetFacing(bool isFacingRight)
+    {
+        if (!visualRoot)
+            return;
+
+        Vector3 scale = visualRoot.localScale;
+        float magnitude = Mathf.Abs(scale.x);
+        if (Mathf.Approximately(magnitude, 0f))
+            magnitude = defaultVisualScaleX;
+
+        scale.x = isFacingRight ? magnitude : -magnitude;
+        visualRoot.localScale = scale;
     }
 
     private void HandleDamaged(float remainingHp)
@@ -219,6 +282,11 @@ public class PlayerAnimationController : MonoBehaviour
     private void LockLocomotion(float duration)
     {
         locomotionLockedUntil = Mathf.Max(locomotionLockedUntil, Time.time + duration);
+    }
+
+    private void ClearAirborneTriggers()
+    {
+        anim.ResetTrigger(JumpHash);
     }
 
     private bool IsGroundedForAnimation()
@@ -260,6 +328,13 @@ public class PlayerAnimationController : MonoBehaviour
             return;
 
         currentLocomotionStateName = stateName;
+        if (transitionDuration <= 0f)
+        {
+            anim.Play(stateName, 0, 0f);
+            anim.Update(0f);
+            return;
+        }
+
         anim.CrossFadeInFixedTime(stateName, Mathf.Clamp(transitionDuration, 0f, 0.12f));
     }
 

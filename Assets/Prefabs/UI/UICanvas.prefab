@@ -421,8 +421,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   inventory: {fileID: 0}
-  watchKey: {fileID: 11400000, guid: 4366e98e9d2297942be9e04551110f1b, type: 2}
-  iconImage: {fileID: 3659183929296360897}
+  iconTemplate: {fileID: 3659183929296360897}
+  iconContainer: {fileID: 7837001823837102332}
+  iconSize: {x: 10, y: 32}
+  spacing: 14
+  maxVisibleIcons: 8
+  duplicateIconsForCount: 1
 --- !u!222 &7675142565593004307
 CanvasRenderer:
   m_ObjectHideFlags: 0

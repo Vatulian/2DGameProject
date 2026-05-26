@@ -46,13 +46,19 @@ public class Health : MonoBehaviour
     public event Action OnRespawned;
 
     public bool IsInvulnerable => invulnerable;
+    public Vector3 LastDamagePoint { get; private set; }
 
     private void Awake()
     {
         currentHealth = startingHealth;
         checkpointHealth = currentHealth;
         anim = GetComponent<Animator>();
+        if (anim == null)
+            anim = GetComponentInChildren<Animator>();
+
         spriteRend = GetComponent<SpriteRenderer>();
+        if (spriteRend == null)
+            spriteRend = GetComponentInChildren<SpriteRenderer>();
         rb = GetComponent<Rigidbody2D>();
         isPlayerCharacter = GetComponent<PlayerRespawn>() != null;
         originalTag = gameObject.tag;
@@ -61,17 +67,28 @@ public class Health : MonoBehaviour
 
     public void TakeDamage(float _damage)
     {
-        TakeDamage(_damage, null);
+        TakeDamage(_damage, null, null);
     }
 
     public void TakeDamage(float _damage, Vector3 knockbackSource)
     {
-        TakeDamage(_damage, (Vector3?)knockbackSource);
+        TakeDamage(_damage, knockbackSource, knockbackSource);
     }
 
-    private void TakeDamage(float _damage, Vector3? knockbackSource)
+    public void TakeDamageAt(float _damage, Vector3 hitWorldPosition)
+    {
+        TakeDamage(_damage, null, hitWorldPosition);
+    }
+
+    public void TakeDamageAt(float _damage, Vector3 hitWorldPosition, Vector3 knockbackSource)
+    {
+        TakeDamage(_damage, knockbackSource, hitWorldPosition);
+    }
+
+    private void TakeDamage(float _damage, Vector3? knockbackSource, Vector3? hitWorldPosition)
     {
         if (invulnerable || dead) return;
+        LastDamagePoint = hitWorldPosition ?? knockbackSource ?? transform.position;
         currentHealth = Mathf.Clamp(currentHealth - _damage, 0, startingHealth);
         OnDamaged?.Invoke(currentHealth);
 
@@ -216,6 +233,40 @@ public class Health : MonoBehaviour
         foreach (Behaviour component in components)
             if (component != null)
                 component.enabled = true;
+    }
+
+    public void ResetToStartingHealth()
+    {
+        if (rb == null)
+            rb = GetComponent<Rigidbody2D>();
+
+        StopAllCoroutines();
+        dead = false;
+        invulnerable = false;
+        currentHealth = startingHealth;
+
+        if (isPlayerCharacter)
+        {
+            gameObject.tag = originalTag;
+            gameObject.layer = originalLayer;
+        }
+
+        enemyCollisionIgnoreRequests = 0;
+        ApplyPlayerEnemyCollisionIgnore();
+
+        if (spriteRend != null)
+            spriteRend.color = Color.white;
+
+        if (rb != null)
+        {
+            rb.velocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+        }
+
+        foreach (Behaviour component in components)
+            if (component != null)
+                component.enabled = true;
+        OnRespawned?.Invoke();
     }
 
     private bool ShouldDisableOnDeath(Behaviour component)

@@ -2,6 +2,8 @@ using UnityEngine;
 
 public class Projectile : MonoBehaviour
 {
+    private const string EnemyAttackLayerName = "EnemyAttack";
+
     [Header("Motion")]
     [SerializeField] private float speed = 10f;
 
@@ -63,6 +65,8 @@ public class Projectile : MonoBehaviour
         // Pass-through layer'ları tamamen yok say (Player, PlayerTriggers vb.)
         if ((passThroughLayers.value & colMask) != 0) return;
 
+        if (IsEnemyAttackCollider(collision)) return;
+
         // Patlama animini tetikle
         hit = true;
         if (myCollider) myCollider.enabled = false;
@@ -79,12 +83,15 @@ public class Projectile : MonoBehaviour
             var hp = collision.GetComponent<Health>() ?? collision.GetComponentInParent<Health>();
             if (hp != null)
             {
-                hp.TakeDamage(1);
+                hp.TakeDamageAt(1, hitPoint);
 
                 // ---- HİT FLASH BURADA ----
-                var flash = hp.GetComponentInChildren<HitFlash>();
-                if (flash != null)
-                    flash.Play();
+                if (!HasBossDamageFeedback(hp))
+                {
+                    var flash = hp.GetComponentInChildren<HitFlash>();
+                    if (flash != null)
+                        flash.Play();
+                }
 
                 return;
             }
@@ -131,6 +138,22 @@ public class Projectile : MonoBehaviour
     /// Geriye uyumluluk; sahibi göndermez (self-hit koruması zayıflar).
     /// </summary>
     public void SetDirection(float dir) => Fire(null, dir);
+
+    private static bool HasBossDamageFeedback(Health health)
+    {
+        return health.GetComponentInParent<BossDamageFeedback>() != null
+               || health.GetComponentInChildren<BossDamageFeedback>() != null;
+    }
+
+    private static bool IsEnemyAttackCollider(Collider2D other)
+    {
+        int enemyAttackLayer = LayerMask.NameToLayer(EnemyAttackLayerName);
+        if (enemyAttackLayer >= 0 && other.gameObject.layer == enemyAttackLayer)
+            return true;
+
+        return other.GetComponentInParent<EliteKillerAttackHitbox>() != null
+               || other.GetComponentInParent<BloodKnightAttack>() != null;
+    }
 
     private void Deactivate()
     {

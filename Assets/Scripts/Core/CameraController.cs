@@ -1,3 +1,4 @@
+using System.Collections;
 using Cinemachine;
 using UnityEngine;
 using UnityEngine.Serialization;
@@ -39,14 +40,12 @@ public class CameraController : MonoBehaviour
 
     [Header("Zoom")]
     [SerializeField] private float normalSize = 5f;
-    [SerializeField] private float bossSize = 7f;
     [FormerlySerializedAs("zoomLerpSpeed")]
     [SerializeField] private float zoomLerpSpeed = 3f;
 
     [Header("Lock Settings")]
     [SerializeField] private bool isLocked;
     [SerializeField] private Vector3 lockedPosition;
-    [SerializeField] private bool useBossZoom;
     [FormerlySerializedAs("lockLerpSpeed")]
     [SerializeField] private float lockLerpSpeed = 2f;
 
@@ -62,6 +61,9 @@ public class CameraController : MonoBehaviour
     private float releaseTimer;
     private float currentZoomVelocity;
     private float currentScreenX;
+    private float lockedOrthographicSize;
+    private Coroutine shakeRoutine;
+    private Vector3 shakeOffset;
 
     private void Awake()
     {
@@ -86,7 +88,6 @@ public class CameraController : MonoBehaviour
         zoomLerpSpeed = Mathf.Max(0.01f, zoomLerpSpeed);
         releaseDuration = Mathf.Max(0.01f, releaseDuration);
         normalSize = Mathf.Max(0.1f, normalSize);
-        bossSize = Mathf.Max(normalSize, bossSize);
         horizontalDamping = Mathf.Max(0f, horizontalDamping);
         verticalDamping = Mathf.Max(0f, verticalDamping);
         deadZoneWidth = Mathf.Clamp01(deadZoneWidth);
@@ -120,24 +121,23 @@ public class CameraController : MonoBehaviour
         UpdateZoom();
     }
 
-    public void LockToPosition(Vector3 worldPos, bool zoomToBoss = false)
+    public void LockToPosition(Vector3 worldPos, float lockedOrthographicSize)
     {
         lockedPosition = worldPos;
         isLocked = true;
-        useBossZoom = zoomToBoss;
+        this.lockedOrthographicSize = Mathf.Max(0.1f, lockedOrthographicSize);
         currentMode = CameraMode.Locked;
     }
 
     public void Unlock(bool smooth = true)
     {
         isLocked = false;
-        useBossZoom = false;
 
         if (smooth && player != null && followTarget != null)
         {
             currentMode = CameraMode.Releasing;
             releaseTimer = 0f;
-            releaseStartPosition = followTarget.position;
+            releaseStartPosition = followTarget.position - shakeOffset;
             return;
         }
 
@@ -145,8 +145,19 @@ public class CameraController : MonoBehaviour
 
         if (followTarget != null && player != null)
         {
-            followTarget.position = CalculateFollowPosition();
+            SetFollowTargetPosition(CalculateFollowPosition());
         }
+    }
+
+    public void Shake(float duration, float magnitude)
+    {
+        if (duration <= 0f || magnitude <= 0f)
+            return;
+
+        if (shakeRoutine != null)
+            StopCoroutine(shakeRoutine);
+
+        shakeRoutine = StartCoroutine(ShakeRoutine(duration, magnitude));
     }
 
     public void SetPlayer(Transform newPlayer)
@@ -155,7 +166,7 @@ public class CameraController : MonoBehaviour
 
         if (snapToPlayerOnStart && followTarget != null && player != null)
         {
-            followTarget.position = CalculateFollowPosition();
+            SetFollowTargetPosition(CalculateFollowPosition());
         }
     }
 
@@ -225,12 +236,12 @@ public class CameraController : MonoBehaviour
 
         Vector3 startPosition = isLocked ? lockedPosition : CalculateFollowPosition();
         startPosition.z = 0f;
-        followTarget.position = startPosition;
+        SetFollowTargetPosition(startPosition);
         currentScreenX = GetTargetScreenX();
 
         if (cam != null)
         {
-            cam.orthographicSize = useBossZoom ? bossSize : normalSize;
+            cam.orthographicSize = GetTargetOrthographicSize();
         }
     }
 
@@ -304,13 +315,13 @@ public class CameraController : MonoBehaviour
     private void UpdateFollowTarget()
     {
         Vector3 desiredPosition;
-        float smoothTime = 1f / followLerpSpeed;
 
         switch (currentMode)
         {
             case CameraMode.Locked:
                 desiredPosition = new Vector3(lockedPosition.x, lockedPosition.y, 0f);
-                followTarget.position = SmoothDampPerAxis(followTarget.position, desiredPosition, lockLerpSpeed, lockLerpSpeed);
+                desiredPosition = GetSafeFollowPosition(desiredPosition);
+                SetFollowTargetPosition(SmoothDampPerAxis(followTarget.position - shakeOffset, desiredPosition, lockLerpSpeed, lockLerpSpeed));
                 break;
 
             case CameraMode.Releasing:
@@ -323,12 +334,14 @@ public class CameraController : MonoBehaviour
                 releaseTimer += Time.deltaTime;
                 float releaseT = Mathf.Clamp01(releaseTimer / releaseDuration);
                 desiredPosition = CalculateFollowPosition();
-                followTarget.position = Vector3.Lerp(releaseStartPosition, desiredPosition, releaseCurve.Evaluate(releaseT));
+                releaseStartPosition = GetSafeFollowPosition(releaseStartPosition);
+                desiredPosition = GetSafeFollowPosition(desiredPosition);
+                SetFollowTargetPosition(Vector3.Lerp(releaseStartPosition, desiredPosition, releaseCurve.Evaluate(releaseT)));
 
                 if (releaseT >= 0.999f)
                 {
                     currentMode = CameraMode.Follow;
-                    followTarget.position = desiredPosition;
+                    SetFollowTargetPosition(desiredPosition);
                 }
                 break;
 
@@ -339,19 +352,52 @@ public class CameraController : MonoBehaviour
                 }
 
                 desiredPosition = CalculateFollowPosition();
-                followTarget.position = SmoothDampPerAxis(followTarget.position, desiredPosition, followLerpSpeed, verticalFollowLerpSpeed);
+                desiredPosition = GetSafeFollowPosition(desiredPosition);
+                SetFollowTargetPosition(SmoothDampPerAxis(followTarget.position - shakeOffset, desiredPosition, followLerpSpeed, verticalFollowLerpSpeed));
                 break;
         }
     }
 
+    private IEnumerator ShakeRoutine(float duration, float magnitude)
+    {
+        float elapsed = 0f;
+        while (elapsed < duration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            float fade = 1f - Mathf.Clamp01(elapsed / duration);
+            shakeOffset = new Vector3(
+                Random.Range(-1f, 1f) * magnitude * fade,
+                Random.Range(-1f, 1f) * magnitude * fade,
+                0f);
+            yield return null;
+        }
+
+        shakeOffset = Vector3.zero;
+        shakeRoutine = null;
+    }
+
+    private void SetFollowTargetPosition(Vector3 position)
+    {
+        if (followTarget != null)
+            followTarget.position = position + shakeOffset;
+    }
+
     private void UpdateZoom()
     {
-        float targetSize = useBossZoom && isLocked ? bossSize : normalSize;
+        float targetSize = GetTargetOrthographicSize();
         float smoothTime = 1f / zoomLerpSpeed;
         float nextSize = Mathf.SmoothDamp(virtualCamera.m_Lens.OrthographicSize, targetSize, ref currentZoomVelocity, smoothTime);
 
         virtualCamera.m_Lens.OrthographicSize = nextSize;
         cam.orthographicSize = nextSize;
+    }
+
+    private float GetTargetOrthographicSize()
+    {
+        if (!isLocked)
+            return normalSize;
+
+        return lockedOrthographicSize > 0f ? lockedOrthographicSize : normalSize;
     }
 
     private void UpdateScreenComposition()
@@ -376,7 +422,7 @@ public class CameraController : MonoBehaviour
 
         float x = player.position.x;
         float y = player.position.y + verticalOffset;
-        return new Vector3(x, y, 0f);
+        return GetSafeFollowPosition(new Vector3(x, y, 0f));
     }
 
     private float ResolveFacingDirection()
@@ -451,11 +497,49 @@ public class CameraController : MonoBehaviour
 
     private Vector3 SmoothDampPerAxis(Vector3 current, Vector3 target, float horizontalSpeed, float verticalSpeed)
     {
+        if (!IsFinite(current))
+        {
+            current = GetSafeFollowPosition(target);
+            followVelocity = Vector3.zero;
+        }
+
+        target = GetSafeFollowPosition(target);
+
+        if (!IsFinite(followVelocity))
+        {
+            followVelocity = Vector3.zero;
+        }
+
         float horizontalSmoothTime = 1f / Mathf.Max(0.01f, horizontalSpeed);
         float verticalSmoothTime = 1f / Mathf.Max(0.01f, verticalSpeed);
 
         float x = Mathf.SmoothDamp(current.x, target.x, ref followVelocity.x, horizontalSmoothTime);
         float y = Mathf.SmoothDamp(current.y, target.y, ref followVelocity.y, verticalSmoothTime);
-        return new Vector3(x, y, target.z);
+        Vector3 result = new Vector3(x, y, target.z);
+        return IsFinite(result) ? result : target;
+    }
+
+    private Vector3 GetSafeFollowPosition(Vector3 candidate)
+    {
+        if (IsFinite(candidate))
+            return candidate;
+
+        if (followTarget != null && IsFinite(followTarget.position))
+            return followTarget.position;
+
+        if (player != null && IsFinite(player.position))
+            return new Vector3(player.position.x, player.position.y + verticalOffset, 0f);
+
+        return new Vector3(transform.position.x, transform.position.y, 0f);
+    }
+
+    private static bool IsFinite(Vector3 value)
+    {
+        return IsFinite(value.x) && IsFinite(value.y) && IsFinite(value.z);
+    }
+
+    private static bool IsFinite(float value)
+    {
+        return !float.IsNaN(value) && !float.IsInfinity(value);
     }
 }

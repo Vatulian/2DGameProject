@@ -274,6 +274,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   door: {fileID: 1202180766752630976}
+  additionalSuccessTargets: []
   requiredKey: {fileID: 11400000, guid: 4366e98e9d2297942be9e04551110f1b, type: 2}
   requiredCount: 1
   consumeOnOpen: 1

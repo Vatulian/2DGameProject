@@ -50,6 +50,11 @@ MonoBehaviour:
   wallJumpTime: 0.2
   doTurnOnWallJump: 1
   wallJumpInputLockTime: 0.15
+  wallJumpCooldown: 0.08
+  sameWallJumpLockTime: 0.25
+  wallJumpMaxUpwardCarrySpeed: 0
+  wallJumpMaxHorizontalSpeed: 25
+  wallJumpMaxVerticalSpeed: 18
   wallClingTime: 0.15
   slideSpeed: -3
   slideAccel: 8

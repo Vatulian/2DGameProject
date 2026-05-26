@@ -13,7 +13,7 @@ public class JumpBehavior : StateMachineBehaviour {
     public float speed;
 
 	override public void OnStateEnter(Animator animator, AnimatorStateInfo stateInfo, int layerIndex) {
-        playerPos = GameObject.FindGameObjectWithTag("Player").GetComponent<Transform>();
+        TryResolvePlayer();
         timer = Random.Range(minTime, maxTime);
 	}
 
@@ -26,6 +26,9 @@ public class JumpBehavior : StateMachineBehaviour {
             timer -= Time.deltaTime;
         }
 
+        if (!TryResolvePlayer())
+            return;
+
         Vector2 target = new Vector2(playerPos.position.x, animator.transform.position.y);
         animator.transform.position = Vector2.MoveTowards(animator.transform.position, target, speed * Time.deltaTime);
 	}
@@ -33,5 +36,19 @@ public class JumpBehavior : StateMachineBehaviour {
 	override public void OnStateExit(Animator animator, AnimatorStateInfo stateInfo, int layerIndex) {
 	
 	}
+
+    private bool TryResolvePlayer()
+    {
+        if (PlayerReference.IsAvailable)
+        {
+            playerPos = PlayerReference.Player;
+            return true;
+        }
+
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        playerPos = player != null ? player.transform : null;
+
+        return playerPos != null;
+    }
 
 }

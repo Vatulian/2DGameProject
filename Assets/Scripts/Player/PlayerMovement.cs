@@ -1,7 +1,7 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.Serialization;
 
-[RequireComponent(typeof(PlayerAnimationController))]
 public class PlayerMovement : MonoBehaviour
 {
     
@@ -36,7 +36,11 @@ public class PlayerMovement : MonoBehaviour
 
     //Wall Jump
     private float _wallJumpStartTime;
+    private float _lastWallJumpTime = float.NegativeInfinity;
+    private float _sameWallJumpLockedUntil;
     private int _lastWallJumpDir;
+    private int _lastWallJumpWallDir;
+    private bool _releasedLastWallJumpWall = true;
     private bool _isTouchingWallRight;
     private bool _isTouchingWallLeft;
 
@@ -69,8 +73,10 @@ public class PlayerMovement : MonoBehaviour
     //Size of groundCheck depends on the size of your character generally you want them slightly small than width (for ground) and height (for the wall check)
     [SerializeField] private Vector2 _groundCheckSize = new Vector2(0.49f, 0.03f);
     [Space(5)]
-    [SerializeField] private Transform _frontWallCheckPoint;
-    [SerializeField] private Transform _backWallCheckPoint;
+    [FormerlySerializedAs("_frontWallCheckPoint")]
+    [SerializeField] private Transform _rightWallCheckPoint;
+    [FormerlySerializedAs("_backWallCheckPoint")]
+    [SerializeField] private Transform _leftWallCheckPoint;
     [SerializeField] private Vector2 _wallCheckSize = new Vector2(0.5f, 1f);
     [SerializeField] private string oneWayPlatformTag = "OneWayPlatform";
     [SerializeField] private float dropThroughPlatformDuration = 0.25f;
@@ -92,6 +98,7 @@ public class PlayerMovement : MonoBehaviour
     private Health health;
     private Collider2D[] playerColliders;
     private Coroutine dropThroughCoroutine;
+    private LedgeClimb ledgeClimb;
 
     #endregion
 
@@ -99,18 +106,22 @@ public class PlayerMovement : MonoBehaviour
     {
         RB = GetComponent<Rigidbody2D>();
         //AnimHandler = GetComponent<PlayerAnimator>();
-        animationController = GetComponent<PlayerAnimationController>();
-        if (!animationController)
-            animationController = gameObject.AddComponent<PlayerAnimationController>();
+        animationController = GetComponentInChildren<PlayerAnimationController>();
         health = GetComponent<Health>();
         playerColliders = GetComponentsInChildren<Collider2D>();
+        ledgeClimb = GetComponent<LedgeClimb>();
 
     }
 
     private void Start()
     {
         SetGravityScale(Data.gravityScale);
+        Vector3 rootScale = transform.localScale;
+        rootScale.x = Mathf.Abs(rootScale.x);
+        transform.localScale = rootScale;
+
         IsFacingRight = true;
+        animationController?.SetFacing(IsFacingRight);
         _dashesLeft = Data.dashAmount;
         _extraJumpsLeft = Data.extraJumpCount;
     }
@@ -118,6 +129,9 @@ public class PlayerMovement : MonoBehaviour
     private void Update()
     {
         if (health != null && health.IsDead)
+            return;
+
+        if (IsClimbing)
             return;
 
         if (forcedHorizontalVelocityTimer > 0f)
@@ -168,14 +182,12 @@ public class PlayerMovement : MonoBehaviour
         #region COLLISION CHECKS
         if (!IsDashing)
         {
-            bool frontWallHit = HasWallContact(_frontWallCheckPoint.position);
-            bool backWallHit = HasWallContact(_backWallCheckPoint.position);
+            bool rightWallHit = HasWallContact(_rightWallCheckPoint.position);
+            bool leftWallHit = HasWallContact(_leftWallCheckPoint.position);
 
-            _isTouchingWallRight = (frontWallHit && IsFacingRight)
-                || (backWallHit && !IsFacingRight);
-
-            _isTouchingWallLeft = (frontWallHit && !IsFacingRight)
-                || (backWallHit && IsFacingRight);
+            _isTouchingWallRight = rightWallHit;
+            _isTouchingWallLeft = leftWallHit;
+            UpdateLastWallJumpWallRelease();
 
             //Ground Check
             if (Physics2D.OverlapBox(_groundCheckPoint.position, _groundCheckSize, 0, _groundLayer)) //checks if set box overlaps with ground
@@ -227,11 +239,13 @@ public class PlayerMovement : MonoBehaviour
 
         if (LastOnGroundTime > 0 && !IsJumping && !IsWallJumping)
         {
-            _isJumpCut = false;
+                _isJumpCut = false;
 
-            _isJumpFalling = false;
-            _extraJumpsLeft = Data.extraJumpCount;
-        }
+                _isJumpFalling = false;
+                _extraJumpsLeft = Data.extraJumpCount;
+                _lastWallJumpWallDir = 0;
+                _releasedLastWallJumpWall = true;
+            }
 
         if (!IsDashing)
         {
@@ -256,7 +270,15 @@ public class PlayerMovement : MonoBehaviour
                 _isJumpFalling = false;
 
                 _wallJumpStartTime = Time.time;
-                _lastWallJumpDir = (LastOnWallRightTime > 0) ? -1 : 1;
+                GetWallJumpDirections(out int wallJumpDir, out int wallDir);
+                _lastWallJumpDir = wallJumpDir;
+                _lastWallJumpWallDir = wallDir;
+                _lastWallJumpTime = Time.time;
+                _sameWallJumpLockedUntil = Time.time + Data.sameWallJumpLockTime;
+                _releasedLastWallJumpWall = false;
+
+                if (Data.doTurnOnWallJump)
+                    CheckDirectionToFace(_lastWallJumpDir > 0);
 
                 WallJump(_lastWallJumpDir);
 
@@ -358,6 +380,12 @@ public class PlayerMovement : MonoBehaviour
     private void FixedUpdate()
     {
         if (health != null && health.IsDead)
+        {
+            RB.velocity = Vector2.zero;
+            return;
+        }
+
+        if (IsClimbing)
         {
             RB.velocity = Vector2.zero;
             return;
@@ -485,12 +513,8 @@ public class PlayerMovement : MonoBehaviour
 
     private void Turn()
     {
-        //stores scale and flips the player along the x axis, 
-        Vector3 scale = transform.localScale;
-        scale.x *= -1;
-        transform.localScale = scale;
-
         IsFacingRight = !IsFacingRight;
+        animationController?.SetFacing(IsFacingRight);
     }
     #endregion
 
@@ -544,8 +568,9 @@ public class PlayerMovement : MonoBehaviour
         Vector2 force = new Vector2(Data.wallJumpForce.x, Data.wallJumpForce.y);
         force.x *= dir; //apply force in opposite direction of wall
 
-        //Eski yatay momentumu temizliyoruz ki wall jump daha consistent olsun
-        RB.velocity = new Vector2(0f, RB.velocity.y);
+        // Reset carry momentum before the impulse so repeated wall jumps cannot stack force.
+        float carriedVerticalVelocity = Mathf.Min(RB.velocity.y, Data.wallJumpMaxUpwardCarrySpeed);
+        RB.velocity = new Vector2(0f, carriedVerticalVelocity);
 
         if (RB.velocity.y < 0) //checks whether player is falling, if so we subtract the velocity.y (counteracting force of gravity). This ensures the player always reaches our desired jump force or greater
             force.y -= RB.velocity.y;
@@ -553,7 +578,22 @@ public class PlayerMovement : MonoBehaviour
         //Unlike in the run we want to use the Impulse mode.
         //The default mode will apply are force instantly ignoring masss
         RB.AddForce(force, ForceMode2D.Impulse);
+        ClampWallJumpVelocity();
         #endregion
+    }
+
+    private void ClampWallJumpVelocity()
+    {
+        float horizontalLimit = Data.wallJumpMaxHorizontalSpeed > 0f
+            ? Data.wallJumpMaxHorizontalSpeed
+            : Mathf.Abs(Data.wallJumpForce.x);
+        float verticalLimit = Data.wallJumpMaxVerticalSpeed > 0f
+            ? Data.wallJumpMaxVerticalSpeed
+            : Data.wallJumpForce.y;
+
+        RB.velocity = new Vector2(
+            Mathf.Clamp(RB.velocity.x, -horizontalLimit, horizontalLimit),
+            Mathf.Min(RB.velocity.y, verticalLimit));
     }
     #endregion
 
@@ -664,11 +704,22 @@ public class PlayerMovement : MonoBehaviour
 
     private bool CanWallJump()
     {
-        bool isTouchingWallNow = _isTouchingWallRight || _isTouchingWallLeft;
-        bool canRepeatFromSameWall = (LastOnWallRightTime > 0 && _lastWallJumpDir == 1)
-            || (LastOnWallLeftTime > 0 && _lastWallJumpDir == -1);
+        if (!_jumpPressedThisFrame || LastOnGroundTime > 0)
+            return false;
 
-        return _jumpPressedThisFrame && (isTouchingWallNow || LastOnWallTime > 0) && LastOnGroundTime <= 0 && (!IsWallJumping || canRepeatFromSameWall);
+        if (Time.time - _lastWallJumpTime < Data.wallJumpCooldown)
+            return false;
+
+        if (!GetWallJumpDirections(out _, out int wallDir))
+            return false;
+
+        if (wallDir == _lastWallJumpWallDir && Time.time < _sameWallJumpLockedUntil)
+            return false;
+
+        if (wallDir == _lastWallJumpWallDir && !_releasedLastWallJumpWall)
+            return false;
+
+        return !IsWallJumping || wallDir != _lastWallJumpWallDir;
     }
 
     private bool CanJumpCut()
@@ -733,6 +784,50 @@ public class PlayerMovement : MonoBehaviour
             return -1;
 
         return 0;
+    }
+
+    private bool GetWallJumpDirections(out int jumpDir, out int wallDir)
+    {
+        wallDir = GetWallJumpWallDirection();
+        jumpDir = wallDir != 0 ? -wallDir : 0;
+        return wallDir != 0;
+    }
+
+    private int GetWallJumpWallDirection()
+    {
+        if (_isTouchingWallRight)
+            return 1;
+
+        if (_isTouchingWallLeft)
+            return -1;
+
+        if (LastOnWallRightTime > LastOnWallLeftTime && LastOnWallRightTime > 0)
+            return 1;
+
+        if (LastOnWallLeftTime > 0)
+            return -1;
+
+        return 0;
+    }
+
+    private void UpdateLastWallJumpWallRelease()
+    {
+        if (_lastWallJumpWallDir == 0 || _releasedLastWallJumpWall)
+            return;
+
+        if (!IsTouchingWallDirection(_lastWallJumpWallDir))
+            _releasedLastWallJumpWall = true;
+    }
+
+    private bool IsTouchingWallDirection(int wallDir)
+    {
+        if (wallDir > 0)
+            return _isTouchingWallRight;
+
+        if (wallDir < 0)
+            return _isTouchingWallLeft;
+
+        return false;
     }
 
     private bool HasWallContact(Vector2 checkPosition)
@@ -839,15 +934,15 @@ public class PlayerMovement : MonoBehaviour
         Gizmos.color = Color.green;
         Gizmos.DrawWireCube(_groundCheckPoint.position, _groundCheckSize);
         Gizmos.color = Color.blue;
-        Gizmos.DrawWireCube(_frontWallCheckPoint.position, _wallCheckSize);
+        Gizmos.DrawWireCube(_rightWallCheckPoint.position, _wallCheckSize);
         Gizmos.color = Color.blue;
-        Gizmos.DrawWireCube(_backWallCheckPoint.position, _wallCheckSize);
+        Gizmos.DrawWireCube(_leftWallCheckPoint.position, _wallCheckSize);
     }
     #endregion
 
     public bool canAttack()
     {
-        return (health == null || !health.IsDead) && !IsDashing && !IsWallJumping && !IsSliding;
+        return (health == null || !health.IsDead) && !IsClimbing && !IsDashing && !IsWallJumping && !IsSliding;
     }
 
     public void SetExternalRunMultiplier(float multiplier)
@@ -870,6 +965,9 @@ public class PlayerMovement : MonoBehaviour
     {
         if (health != null && health.IsDead)
             return;
+
+        if (ledgeClimb != null && ledgeClimb.IsClimbing)
+            ledgeClimb.CancelClimb();
 
         if (IsDashing)
         {
@@ -900,8 +998,10 @@ public class PlayerMovement : MonoBehaviour
 
     public bool IsAirborne()
     {
-        return LastOnGroundTime <= 0f && !IsDashing && !IsSliding;
+        return LastOnGroundTime <= 0f && !IsClimbing && !IsDashing && !IsSliding;
     }
+
+    public bool IsClimbing => ledgeClimb != null && ledgeClimb.IsClimbing;
 
     public void ApplyAirAttackFloat()
     {

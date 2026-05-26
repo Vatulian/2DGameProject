@@ -1,8 +1,11 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
 public class FlameEnemyAI : MonoBehaviour
 {
+    private const string EnemyAttackLayerName = "EnemyAttack";
+
     private enum State
     {
         Patrol,
@@ -58,9 +61,13 @@ public class FlameEnemyAI : MonoBehaviour
     [Header("Attack")]
     [SerializeField] private float prepTime = 0.5f;
     [SerializeField] private float flameDuration = 1.2f;
+    [Tooltip("Minimum delay between separate flame entries. Staying inside the flame does not keep ticking damage.")]
     [SerializeField] private float damageInterval = 0.25f;
     [SerializeField] private float recoveryTime = 1.1f;
     [SerializeField] private int damage = 1;
+    [SerializeField] private float flameKnockbackSpeed = 13f;
+    [SerializeField] private float flameKnockbackDuration = 0.22f;
+    [SerializeField] private float flameKnockbackUpwardVelocity = 2.5f;
 
     [Tooltip("If true, once Prep starts the enemy will flame even if the player leaves the cone.")]
     [SerializeField] private bool commitAttack = true;
@@ -81,10 +88,12 @@ public class FlameEnemyAI : MonoBehaviour
     private State state = State.Patrol;
     private int dir = 1;
     private float timer;
-    private float damageTimer;
     private float damageAggroTimer;
     private float leftX;
     private float rightX;
+    private readonly HashSet<Health> flameTargetsInside = new HashSet<Health>();
+    private readonly HashSet<Health> currentFlameTargets = new HashSet<Health>();
+    private readonly Dictionary<Health, float> nextFlameDamageTimes = new Dictionary<Health, float>();
 
     private int attackDir = 1;
     private Vector2 flameBaseLocalPos;
@@ -94,6 +103,9 @@ public class FlameEnemyAI : MonoBehaviour
 
     private void OnValidate()
     {
+        CacheFlameAreaReferences();
+        ApplyFlameAreaLayer();
+
         viewDistance = Mathf.Max(0.05f, viewDistance);
         awarenessRadius = Mathf.Max(awarenessRadius, viewDistance);
         attackDistance = Mathf.Max(0.05f, attackDistance);
@@ -103,6 +115,10 @@ public class FlameEnemyAI : MonoBehaviour
         groundCheckDownDistance = Mathf.Max(0.05f, groundCheckDownDistance);
         turnPrepTime = Mathf.Max(0f, turnPrepTime);
         damageAggroTime = Mathf.Max(0f, damageAggroTime);
+        damageInterval = Mathf.Max(0f, damageInterval);
+        flameKnockbackSpeed = Mathf.Max(0f, flameKnockbackSpeed);
+        flameKnockbackDuration = Mathf.Max(0f, flameKnockbackDuration);
+        flameKnockbackUpwardVelocity = Mathf.Max(0f, flameKnockbackUpwardVelocity);
     }
 
     private void Awake()
@@ -117,11 +133,8 @@ public class FlameEnemyAI : MonoBehaviour
         if (anim == null)
             anim = sprite != null ? sprite.GetComponent<Animator>() : GetComponentInChildren<Animator>();
 
-        if (flameAreaTf == null && flameArea != null)
-            flameAreaTf = flameArea.transform;
-
-        if (flameArea == null && flameAreaTf != null)
-            flameArea = flameAreaTf.GetComponent<BoxCollider2D>();
+        CacheFlameAreaReferences();
+        ApplyFlameAreaLayer();
 
         if (detectionOrigin == null)
             detectionOrigin = transform;
@@ -434,7 +447,8 @@ public class FlameEnemyAI : MonoBehaviour
     {
         state = State.Flame;
         timer = flameDuration;
-        damageTimer = damageInterval;
+        flameTargetsInside.Clear();
+        currentFlameTargets.Clear();
         Stop();
 
         if (lockFacingDuringAttack)
@@ -464,22 +478,14 @@ public class FlameEnemyAI : MonoBehaviour
             if (flameArea != null)
                 flameArea.enabled = false;
 
+            flameTargetsInside.Clear();
+            currentFlameTargets.Clear();
             state = State.Recovery;
             timer = recoveryTime;
             return;
         }
 
-        if (playerHealth == null || flameArea == null)
-            return;
-
-        damageTimer += Time.deltaTime;
-        if (damageTimer < damageInterval)
-            return;
-
-        damageTimer = 0f;
-        Collider2D hit = Physics2D.OverlapBox(flameArea.bounds.center, flameArea.bounds.size, 0f, playerLayer);
-        if (hit != null && hit.CompareTag("Player"))
-            playerHealth.TakeDamage(damage);
+        UpdateFlameContactDamage();
     }
 
     private void TickRecovery()
@@ -599,6 +605,103 @@ public class FlameEnemyAI : MonoBehaviour
 
         if (flameAreaTf != null)
             flameAreaTf.localPosition = new Vector3(flameAbsX * dir, flameBaseY, flameAreaTf.localPosition.z);
+    }
+
+    private void CacheFlameAreaReferences()
+    {
+        if (flameAreaTf == null && flameArea != null)
+            flameAreaTf = flameArea.transform;
+
+        if (flameArea == null && flameAreaTf != null)
+            flameArea = flameAreaTf.GetComponent<BoxCollider2D>();
+    }
+
+    private void ApplyFlameAreaLayer()
+    {
+        if (flameAreaTf == null)
+            return;
+
+        int enemyAttackLayer = LayerMask.NameToLayer(EnemyAttackLayerName);
+        if (enemyAttackLayer >= 0 && flameAreaTf.gameObject.layer != enemyAttackLayer)
+            flameAreaTf.gameObject.layer = enemyAttackLayer;
+    }
+
+    private void UpdateFlameContactDamage()
+    {
+        if (flameArea == null)
+            return;
+
+        currentFlameTargets.Clear();
+        Collider2D[] hits = Physics2D.OverlapBoxAll(flameArea.bounds.center, flameArea.bounds.size, 0f, playerLayer);
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider2D hit = hits[i];
+            if (hit == null || hit.GetComponent<PlayerMeleeHitbox>() != null)
+                continue;
+
+            Health targetHealth = hit.GetComponent<Health>() ?? hit.GetComponentInParent<Health>();
+            if (targetHealth == null || targetHealth.IsDead)
+                continue;
+
+            if (hit.GetComponentInParent<PlayerMovement>() == null && !targetHealth.CompareTag("Player"))
+                continue;
+
+            currentFlameTargets.Add(targetHealth);
+
+            if (!flameTargetsInside.Contains(targetHealth))
+                TryDamageFlameTarget(targetHealth, hit);
+        }
+
+        flameTargetsInside.Clear();
+        foreach (Health target in currentFlameTargets)
+            flameTargetsInside.Add(target);
+    }
+
+    private void TryDamageFlameTarget(Health targetHealth, Collider2D hitCollider)
+    {
+        if (targetHealth == null || targetHealth.IsDead || targetHealth.IsInvulnerable)
+            return;
+
+        if (nextFlameDamageTimes.TryGetValue(targetHealth, out float nextAllowedTime) && Time.time < nextAllowedTime)
+            return;
+
+        nextFlameDamageTimes[targetHealth] = Time.time + damageInterval;
+
+        float previousHealth = targetHealth.CurrentHealth;
+        Vector3 hitPoint = hitCollider.bounds.ClosestPoint(flameArea.bounds.center);
+        targetHealth.TakeDamageAt(damage, hitPoint);
+
+        if (targetHealth.IsDead || targetHealth.CurrentHealth >= previousHealth)
+            return;
+
+        ApplyFlameKnockback(targetHealth);
+    }
+
+    private void ApplyFlameKnockback(Health targetHealth)
+    {
+        Vector3 sourcePosition = GetFlameKnockbackSource(targetHealth.transform.position);
+        PlayerMovement movement = targetHealth.GetComponent<PlayerMovement>() ?? targetHealth.GetComponentInParent<PlayerMovement>();
+        if (movement != null)
+        {
+            movement.ApplyKnockbackFrom(sourcePosition, flameKnockbackSpeed, flameKnockbackDuration, flameKnockbackUpwardVelocity);
+            return;
+        }
+
+        Rigidbody2D targetRb = targetHealth.GetComponent<Rigidbody2D>() ?? targetHealth.GetComponentInParent<Rigidbody2D>();
+        if (targetRb == null)
+            return;
+
+        float knockDirection = targetHealth.transform.position.x >= sourcePosition.x ? 1f : -1f;
+        targetRb.velocity = new Vector2(knockDirection * flameKnockbackSpeed, Mathf.Max(targetRb.velocity.y, flameKnockbackUpwardVelocity));
+    }
+
+    private Vector3 GetFlameKnockbackSource(Vector3 targetPosition)
+    {
+        float knockDirection = targetPosition.x >= transform.position.x ? 1f : -1f;
+        if (Mathf.Approximately(targetPosition.x, transform.position.x))
+            knockDirection = attackDir >= 0 ? 1f : -1f;
+
+        return targetPosition - Vector3.right * knockDirection;
     }
 
     private void PlayOnce(string stateName)

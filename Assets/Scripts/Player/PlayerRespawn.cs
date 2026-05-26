@@ -20,7 +20,12 @@ public class PlayerRespawn : MonoBehaviour
         playerHealth = GetComponent<Health>();
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponent<SpriteRenderer>();
+        if (spriteRenderer == null)
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+
         anim = GetComponent<Animator>();
+        if (anim == null)
+            anim = GetComponentInChildren<Animator>();
         uiManager = FindAnyObjectByType<UIManager>();
     }
 
@@ -43,14 +48,7 @@ public class PlayerRespawn : MonoBehaviour
 
             playerHealth.Respawn();
 
-            // Reset boss fight state if the boss is still alive.
-            Boss boss = FindObjectOfType<Boss>(true);
-            if (boss != null && !boss.isDead)
-            {
-                BossTriggerZone zone = FindObjectOfType<BossTriggerZone>(true);
-                if (zone != null)
-                    zone.ResetBossFight();
-            }
+            BossTriggerZone.ResetActiveBossFight();
         }
         else
         {

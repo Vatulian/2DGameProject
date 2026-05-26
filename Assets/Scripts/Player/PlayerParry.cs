@@ -32,9 +32,9 @@ public class PlayerParry : MonoBehaviour
     private void Awake()
     {
         if (!anim)
-            anim = GetComponent<Animator>();
+            anim = GetComponent<Animator>() ?? GetComponentInChildren<Animator>();
 
-        animationController = GetComponent<PlayerAnimationController>();
+        animationController = GetComponentInChildren<PlayerAnimationController>();
         movement = GetComponent<PlayerMovement>();
         meleeAttack = GetComponent<PlayerMeleeAttack>();
         health = GetComponent<Health>();
@@ -60,7 +60,7 @@ public class PlayerParry : MonoBehaviour
         if (cooldownTimer > 0f || activeTimer > 0f)
             return false;
 
-        if (movement != null && movement.IsDashing)
+        if (movement != null && (movement.IsDashing || movement.IsClimbing))
             return false;
 
         meleeAttack?.TryCancelForParry();

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class DoorController : MonoBehaviour
+public class DoorController : MonoBehaviour, IActivatable
 {
     [SerializeField] private Animator animator;
     [SerializeField] private Collider2D doorCollider;
@@ -9,6 +9,7 @@ public class DoorController : MonoBehaviour
     [SerializeField] private bool startOpen = false;
 
     private bool isOpen;
+    public bool IsActive => isOpen;
 
     private void Reset()
     {
@@ -69,6 +70,24 @@ public class DoorController : MonoBehaviour
 
         animator.ResetTrigger("Open");
         animator.SetTrigger("Close");
+    }
+
+    public void Activate(GameObject source = null)
+    {
+        OpenDoor();
+    }
+
+    public void Deactivate(GameObject source = null)
+    {
+        CloseDoor();
+    }
+
+    public void Toggle(GameObject source = null)
+    {
+        if (isOpen)
+            CloseDoor();
+        else
+            OpenDoor();
     }
 
     // --- Animation Events ---

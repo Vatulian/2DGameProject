@@ -3,6 +3,8 @@ using UnityEngine;
 
 public class BloodKnightAttack : MonoBehaviour
 {
+    private const string EnemyAttackLayerName = "EnemyAttack";
+
     [Header("Refs")]
     [SerializeField] private BoxCollider2D attackCollider;
 
@@ -19,6 +21,7 @@ public class BloodKnightAttack : MonoBehaviour
     [SerializeField] private bool canBeParried = true;
 
     private readonly HashSet<Collider2D> hitTargets = new HashSet<Collider2D>();
+    private readonly HashSet<Health> hitHealthTargets = new HashSet<Health>();
 
     private Transform owner;
     private int facing = 1;
@@ -29,6 +32,8 @@ public class BloodKnightAttack : MonoBehaviour
 
     private void Awake()
     {
+        ApplyEnemyAttackLayer();
+
         if (attackCollider == null)
             attackCollider = GetComponent<BoxCollider2D>();
 
@@ -45,6 +50,7 @@ public class BloodKnightAttack : MonoBehaviour
         owner = attackOwner;
         WasParried = false;
         hitTargets.Clear();
+        hitHealthTargets.Clear();
         DisableHitbox();
         SetFacing(__);
     }
@@ -59,6 +65,7 @@ public class BloodKnightAttack : MonoBehaviour
     {
         active = true;
         hitTargets.Clear();
+        hitHealthTargets.Clear();
 
         if (attackCollider != null)
             attackCollider.enabled = true;
@@ -87,6 +94,9 @@ public class BloodKnightAttack : MonoBehaviour
         if (!active || other == null || hitTargets.Contains(other))
             return;
 
+        if (other.GetComponent<PlayerMeleeHitbox>() != null)
+            return;
+
         if ((playerLayer.value & (1 << other.gameObject.layer)) == 0)
             return;
 
@@ -101,7 +111,11 @@ public class BloodKnightAttack : MonoBehaviour
         if (health == null)
             return;
 
+        if (hitHealthTargets.Contains(health))
+            return;
+
         hitTargets.Add(other);
+        hitHealthTargets.Add(health);
         if (applyKnockback)
             health.TakeDamage(damage, owner != null ? owner.position : transform.position);
         else
@@ -130,8 +144,17 @@ public class BloodKnightAttack : MonoBehaviour
         attackCollider.offset = new Vector2(Mathf.Abs(rightFacingOffset.x) * facing, rightFacingOffset.y);
     }
 
+    private void ApplyEnemyAttackLayer()
+    {
+        int enemyAttackLayer = LayerMask.NameToLayer(EnemyAttackLayerName);
+        if (enemyAttackLayer >= 0 && gameObject.layer != enemyAttackLayer)
+            gameObject.layer = enemyAttackLayer;
+    }
+
     private void OnValidate()
     {
+        ApplyEnemyAttackLayer();
+
         if (attackCollider == null)
             attackCollider = GetComponent<BoxCollider2D>();
 

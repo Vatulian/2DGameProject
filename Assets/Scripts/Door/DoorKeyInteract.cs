@@ -4,6 +4,7 @@ public class DoorKeyInteract : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private DoorController door;
+    [SerializeField] private ActivationTarget[] additionalSuccessTargets;
 
     [Header("Key Requirement")]
     [SerializeField] private KeyItem requiredKey;
@@ -28,6 +29,11 @@ public class DoorKeyInteract : MonoBehaviour
 
         if (requiredKey == null)
             Debug.LogWarning("[Door] RequiredKey is NULL! Kapı hiç açılmaz. Inspector'dan KeyItem bağla.");
+    }
+
+    private void OnValidate()
+    {
+        requiredCount = Mathf.Max(1, requiredCount);
     }
 
     private void Update()
@@ -59,8 +65,20 @@ public class DoorKeyInteract : MonoBehaviour
 
             opened = true;
             Debug.Log("[Door] OPENING DOOR");
-            door.OpenDoor();
+            OpenDoorAndInvokeTargets();
         }
+    }
+
+    private void OpenDoorAndInvokeTargets()
+    {
+        if (door != null)
+            door.Activate(gameObject);
+
+        if (additionalSuccessTargets == null)
+            return;
+
+        for (int i = 0; i < additionalSuccessTargets.Length; i++)
+            additionalSuccessTargets[i]?.Invoke(gameObject);
     }
 
     // Forwarder child trigger bunu çağırır

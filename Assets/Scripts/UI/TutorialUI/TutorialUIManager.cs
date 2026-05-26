@@ -20,6 +20,16 @@ public class TutorialUIManager : MonoBehaviour
     [SerializeField] private TextMeshProUGUI hintText;
     [SerializeField] private Image iconImage;
 
+    [Header("Layout")]
+    [SerializeField] private bool configureLayoutOnAwake = true;
+    [SerializeField] private Vector2 panelSize = new Vector2(600f, 120f);
+    [SerializeField] private float contentWidth = 360f;
+    [SerializeField] private float iconSlotWidth = 64f;
+    [SerializeField] private float iconSize = 56f;
+    [SerializeField] private float contentSpacing = 16f;
+    [SerializeField] private float textHeight = 96f;
+    [SerializeField] private float textFontSize = 28f;
+
     [Header("Fade")]
     [SerializeField] private float fadeInDuration = 0.15f;
     [SerializeField] private float fadeOutDuration = 0.15f;
@@ -43,6 +53,9 @@ public class TutorialUIManager : MonoBehaviour
             if (canvasGroup == null)
                 canvasGroup = panel.AddComponent<CanvasGroup>();
         }
+
+        if (configureLayoutOnAwake)
+            ApplyLayout();
     }
 
     private void Start()
@@ -65,6 +78,7 @@ public class TutorialUIManager : MonoBehaviour
             if (request.icon != null)
             {
                 iconImage.sprite = request.icon;
+                iconImage.preserveAspect = true;
                 iconImage.gameObject.SetActive(true);
             }
             else
@@ -72,6 +86,9 @@ public class TutorialUIManager : MonoBehaviour
                 iconImage.gameObject.SetActive(false);
             }
         }
+
+        if (configureLayoutOnAwake)
+            ApplyLayout();
 
         StartFade(1f, fadeInDuration, false);
     }
@@ -109,6 +126,46 @@ public class TutorialUIManager : MonoBehaviour
             StopCoroutine(fadeRoutine);
 
         fadeRoutine = StartCoroutine(FadeRoutine(targetAlpha, duration, disableOnEnd));
+    }
+
+    private void ApplyLayout()
+    {
+        RectTransform panelRect = panel != null ? panel.GetComponent<RectTransform>() : null;
+        RectTransform textRect = hintText != null ? hintText.rectTransform : null;
+        RectTransform iconRect = iconImage != null ? iconImage.rectTransform : null;
+
+        if (panelRect == null || textRect == null)
+            return;
+
+        panelRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, panelSize.x);
+        panelRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, panelSize.y);
+
+        float safeIconSlotWidth = iconImage != null && iconImage.gameObject.activeSelf ? iconSlotWidth : 0f;
+        float safeSpacing = safeIconSlotWidth > 0f ? contentSpacing : 0f;
+        float textWidth = Mathf.Max(1f, contentWidth - safeIconSlotWidth - safeSpacing);
+        float contentLeft = -contentWidth * 0.5f;
+
+        if (iconRect != null)
+        {
+            iconRect.anchorMin = new Vector2(0.5f, 0.5f);
+            iconRect.anchorMax = new Vector2(0.5f, 0.5f);
+            iconRect.pivot = new Vector2(0.5f, 0.5f);
+            iconRect.anchoredPosition = new Vector2(contentLeft + safeIconSlotWidth * 0.5f, 0f);
+            iconRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, iconSize);
+            iconRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, iconSize);
+        }
+
+        textRect.anchorMin = new Vector2(0.5f, 0.5f);
+        textRect.anchorMax = new Vector2(0.5f, 0.5f);
+        textRect.pivot = new Vector2(0f, 0.5f);
+        textRect.anchoredPosition = new Vector2(contentLeft + safeIconSlotWidth + safeSpacing, 0f);
+        textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, textWidth);
+        textRect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, textHeight);
+
+        hintText.alignment = TextAlignmentOptions.MidlineLeft;
+        hintText.enableWordWrapping = true;
+        hintText.overflowMode = TextOverflowModes.Truncate;
+        hintText.fontSize = textFontSize;
     }
 
     private IEnumerator FadeRoutine(float targetAlpha, float duration, bool disableOnEnd)

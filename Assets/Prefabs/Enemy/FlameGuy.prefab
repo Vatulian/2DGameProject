@@ -10,7 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2932946316147135009}
   - component: {fileID: 2712297391552338574}
-  m_Layer: 11
+  m_Layer: 15
   m_Name: FlameArea
   m_TagString: Untagged
   m_Icon: {fileID: 0}

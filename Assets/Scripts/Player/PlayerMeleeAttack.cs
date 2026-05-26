@@ -64,7 +64,7 @@ public class PlayerMeleeAttack : MonoBehaviour
 
     private void Awake()
     {
-        animationController = GetComponent<PlayerAnimationController>();
+        animationController = GetComponentInChildren<PlayerAnimationController>();
         playerMovement = GetComponent<PlayerMovement>();
         playerAttack = GetComponent<PlayerAttack>();
         health = GetComponent<Health>();
@@ -171,7 +171,8 @@ public class PlayerMeleeAttack : MonoBehaviour
             playerMovement.ApplyAirAttackFloat();
 
         playerMovement?.SetExternalRunMultiplier(0f);
-        meleeHitbox?.Configure(phase.damage, phase.hitboxSize, phase.hitboxOffset, phase.hitboxAnchor);
+        float facing = playerMovement != null && !playerMovement.IsFacingRight ? -1f : 1f;
+        meleeHitbox?.Configure(phase.damage, phase.hitboxSize, phase.hitboxOffset, phase.hitboxAnchor, facing);
 
         if (animationController != null)
         {

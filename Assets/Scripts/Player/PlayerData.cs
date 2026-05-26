@@ -68,6 +68,11 @@ public class PlayerData : ScriptableObject
 
     [Header("Wall Settings")]
     [Range(0f, 0.3f)] public float wallJumpInputLockTime = 0.15f; //Short delay before allowing flip/input influence after wall jump
+    [Range(0f, 0.3f)] public float wallJumpCooldown = 0.08f;
+    [Range(0f, 0.5f)] public float sameWallJumpLockTime = 0.25f;
+    [Range(0f, 10f)] public float wallJumpMaxUpwardCarrySpeed = 0f;
+    [Range(0f, 60f)] public float wallJumpMaxHorizontalSpeed = 25f;
+    [Range(0f, 60f)] public float wallJumpMaxVerticalSpeed = 18f;
     [Range(0f, 0.5f)] public float wallClingTime = 0.15f; //How long the player sticks to the wall before starting to slide
 
     [Space(20)]
@@ -124,6 +129,11 @@ public class PlayerData : ScriptableObject
         airAttackMaxUpwardSpeed = Mathf.Max(0f, airAttackMaxUpwardSpeed);
         airAttackRestartGraceTime = Mathf.Max(0f, airAttackRestartGraceTime);
         airAttackGraceMaxFallSpeed = Mathf.Max(0f, airAttackGraceMaxFallSpeed);
+        wallJumpCooldown = Mathf.Max(0f, wallJumpCooldown);
+        sameWallJumpLockTime = Mathf.Max(0f, sameWallJumpLockTime);
+        wallJumpMaxUpwardCarrySpeed = Mathf.Max(0f, wallJumpMaxUpwardCarrySpeed);
+        wallJumpMaxHorizontalSpeed = Mathf.Max(0f, wallJumpMaxHorizontalSpeed);
+        wallJumpMaxVerticalSpeed = Mathf.Max(0f, wallJumpMaxVerticalSpeed);
         #endregion
     }
 }
