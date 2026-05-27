@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
-public class EliteKillerBossAI : MonoBehaviour, IBossEncounterTarget
+public class EliteKillerBossAI : MonoBehaviour, IBossEncounterTarget, IParryReceiver
 {
     private enum State
     {
@@ -115,6 +115,7 @@ public class EliteKillerBossAI : MonoBehaviour, IBossEncounterTarget
     [SerializeField] private float leapLandingOffsetFromPlayer = 1.15f;
     [SerializeField] private float chainWindupAfterLeap = 0.25f;
     [SerializeField] private int leapTouchDamage = 1;
+    [SerializeField] private ParryAttackSettings leapTouchParry = new ParryAttackSettings();
     [SerializeField] private AnimationCurve leapCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
 
     [Header("Leap Feedback")]
@@ -489,6 +490,7 @@ public class EliteKillerBossAI : MonoBehaviour, IBossEncounterTarget
         Play(attackStateName);
 
         comboHitbox?.Begin(transform, lockedAttackFacing);
+        comboHitbox?.PlayParryCue(transform);
 
         if (useAnimationEvents)
         {
@@ -513,9 +515,8 @@ public class EliteKillerBossAI : MonoBehaviour, IBossEncounterTarget
             yield return new WaitForSeconds(Mathf.Max(0f, window.duration));
             elapsed += Mathf.Max(0f, window.duration);
 
-            if (comboHitbox != null && comboHitbox.WasParried)
+            if (state == State.Parried)
             {
-                StartParried();
                 yield break;
             }
         }
@@ -574,6 +575,7 @@ public class EliteKillerBossAI : MonoBehaviour, IBossEncounterTarget
 
         EliteKillerAttackHitbox activeChainHitbox = chainHitbox != null ? chainHitbox : comboHitbox;
         activeChainHitbox?.Begin(transform, lockedAttackFacing);
+        activeChainHitbox?.PlayParryCue(transform);
 
         if (!useAnimationEvents)
             activeChainHitbox?.PlayChain(chainExtendDuration, chainHoldDuration, chainRetractDuration);
@@ -591,9 +593,8 @@ public class EliteKillerBossAI : MonoBehaviour, IBossEncounterTarget
 
             elapsed += Time.deltaTime;
 
-            if (activeChainHitbox != null && activeChainHitbox.WasParried)
+            if (state == State.Parried)
             {
-                StartParried();
                 yield break;
             }
 
@@ -615,9 +616,8 @@ public class EliteKillerBossAI : MonoBehaviour, IBossEncounterTarget
 
             elapsed += Time.deltaTime;
 
-            if (hitbox != null && hitbox.WasParried)
+            if (state == State.Parried)
             {
-                StartParried();
                 yield break;
             }
 
@@ -661,6 +661,7 @@ public class EliteKillerBossAI : MonoBehaviour, IBossEncounterTarget
         state = State.ChainLeap;
         leapTouchTargets.Clear();
         Play(jumpStateName);
+        leapTouchParry?.PlayCue(this, transform);
 
         Vector3 start = GetActorPosition();
         FaceTarget(playerPosition);
@@ -753,6 +754,14 @@ public class EliteKillerBossAI : MonoBehaviour, IBossEncounterTarget
         comboHitbox?.DisableHitbox();
         chainHitbox?.DisableHitbox();
         Play(hitStateName);
+    }
+
+    public void OnParried(PlayerParry parry, Vector3 attackerPosition)
+    {
+        if (state == State.Parried || state == State.Dead)
+            return;
+
+        StartParried();
     }
 
     private void HandleDeath()
@@ -877,6 +886,7 @@ public class EliteKillerBossAI : MonoBehaviour, IBossEncounterTarget
 
         EliteKillerAttackHitbox activeChainHitbox = chainHitbox != null ? chainHitbox : comboHitbox;
         activeChainHitbox?.Begin(transform, lockedAttackFacing);
+        activeChainHitbox?.PlayParryCue(transform);
         activeChainHitbox?.PlayChain(chainExtendDuration, chainHoldDuration, chainRetractDuration);
     }
 
@@ -920,6 +930,9 @@ public class EliteKillerBossAI : MonoBehaviour, IBossEncounterTarget
             return;
 
         leapTouchTargets.Add(other);
+        if (leapTouchParry != null && leapTouchParry.TryParry(other, GetActorPosition(), this))
+            return;
+
         playerHealth.TakeDamage(leapTouchDamage, GetActorPosition());
     }
 

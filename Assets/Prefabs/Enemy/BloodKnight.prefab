@@ -463,7 +463,13 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 1024
   applyKnockback: 1
-  canBeParried: 1
+  parry:
+    canBeParried: 1
+    cuePoint: {fileID: 0}
+    cueOffset: {x: 0, y: 0, z: 0}
+    parryableCuePrefab: {fileID: 0}
+    unparryableCuePrefab: {fileID: 0}
+    cueLifetime: 1
 --- !u!61 &4830857348903525135
 BoxCollider2D:
   m_ObjectHideFlags: 0

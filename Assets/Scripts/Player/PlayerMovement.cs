@@ -43,6 +43,7 @@ public class PlayerMovement : MonoBehaviour
     private bool _releasedLastWallJumpWall = true;
     private bool _isTouchingWallRight;
     private bool _isTouchingWallLeft;
+    private bool _hasGroundContact;
 
     //Dash
     private int _dashesLeft;
@@ -62,6 +63,7 @@ public class PlayerMovement : MonoBehaviour
     #region INPUT PARAMETERS
     private Vector2 _moveInput;
 
+    public float HorizontalInput => _moveInput.x;
     public float LastPressedJumpTime { get; private set; }
     public float LastPressedDashTime { get; private set; }
     #endregion
@@ -81,6 +83,8 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private string oneWayPlatformTag = "OneWayPlatform";
     [SerializeField] private float dropThroughPlatformDuration = 0.25f;
     [SerializeField] private float dropThroughPushSpeed = 2f;
+    [SerializeField] private float movingPlatformGroundProbeDistance = 0.08f;
+    [SerializeField] private float movingPlatformJumpIgnoreDuration = 0.12f;
     #endregion
 
     #region LAYERS & TAGS
@@ -91,6 +95,7 @@ public class PlayerMovement : MonoBehaviour
     //Animation
     private PlayerAnimationController animationController;
     private float externalRunMultiplier = 1f;
+    private float horizontalMovementLockTimer;
     private float forcedHorizontalVelocity;
     private float forcedHorizontalVelocityTimer;
     private float airAttackFloatTimer;
@@ -98,7 +103,11 @@ public class PlayerMovement : MonoBehaviour
     private Health health;
     private Collider2D[] playerColliders;
     private Coroutine dropThroughCoroutine;
+    private Collider2D ignoredDropThroughPlatform;
     private LedgeClimb ledgeClimb;
+    private LandMovement currentMovingPlatform;
+    private LandMovement jumpIgnoredMovingPlatform;
+    private float movingPlatformJumpIgnoreTimer;
 
     #endregion
 
@@ -137,11 +146,16 @@ public class PlayerMovement : MonoBehaviour
         if (forcedHorizontalVelocityTimer > 0f)
             forcedHorizontalVelocityTimer -= Time.deltaTime;
 
+        if (horizontalMovementLockTimer > 0f)
+            horizontalMovementLockTimer -= Time.deltaTime;
+
         if (airAttackFloatTimer > 0f)
             airAttackFloatTimer -= Time.deltaTime;
 
         if (airAttackRestartGraceTimer > 0f)
             airAttackRestartGraceTimer -= Time.deltaTime;
+
+        TickMovingPlatformJumpIgnore();
 
         #region TIMERS
         LastOnGroundTime -= Time.deltaTime;
@@ -180,6 +194,8 @@ public class PlayerMovement : MonoBehaviour
         #endregion
 
         #region COLLISION CHECKS
+        _hasGroundContact = false;
+
         if (!IsDashing)
         {
             bool rightWallHit = HasWallContact(_rightWallCheckPoint.position);
@@ -190,7 +206,8 @@ public class PlayerMovement : MonoBehaviour
             UpdateLastWallJumpWallRelease();
 
             //Ground Check
-            if (Physics2D.OverlapBox(_groundCheckPoint.position, _groundCheckSize, 0, _groundLayer)) //checks if set box overlaps with ground
+            _hasGroundContact = UpdateGroundContact();
+            if (_hasGroundContact) //checks if set box overlaps with ground
             {
                 if (LastOnGroundTime < -0.1f)
                 {
@@ -339,7 +356,7 @@ public class PlayerMovement : MonoBehaviour
             {
                 SetGravityScale(0);
             }
-            else if (RB.velocity.y < 0 && _moveInput.y < 0)
+            else if (!_hasGroundContact && RB.velocity.y < 0 && _moveInput.y < 0)
             {
                 //Much higher gravity if holding down
                 SetGravityScale(Data.gravityScale * Data.fastFallGravityMult);
@@ -356,7 +373,7 @@ public class PlayerMovement : MonoBehaviour
             {
                 SetGravityScale(Data.gravityScale * Data.jumpHangGravityMult);
             }
-            else if (RB.velocity.y < 0)
+            else if (!_hasGroundContact && RB.velocity.y < 0)
             {
                 //Higher gravity if falling
                 SetGravityScale(Data.gravityScale * Data.fallGravityMult);
@@ -391,13 +408,19 @@ public class PlayerMovement : MonoBehaviour
             return;
         }
 
+        bool horizontalMovementLocked = horizontalMovementLockTimer > 0f;
+
         if (forcedHorizontalVelocityTimer > 0f)
         {
             RB.velocity = new Vector2(forcedHorizontalVelocity, RB.velocity.y);
         }
+        else if (horizontalMovementLocked)
+        {
+            RB.velocity = new Vector2(GetMovingPlatformVelocity().x, RB.velocity.y);
+        }
 
         //Handle Run
-        if (!IsDashing && forcedHorizontalVelocityTimer <= 0f)
+        if (!IsDashing && forcedHorizontalVelocityTimer <= 0f && !horizontalMovementLocked)
         {
             if (IsWallJumping)
                 Run(Data.wallJumpRunLerp);
@@ -408,6 +431,8 @@ public class PlayerMovement : MonoBehaviour
         {
             Run(Data.dashEndRunLerp);
         }
+
+        ApplyMovingPlatformVelocity();
 
         //Handle Slide
         if (IsSliding)
@@ -460,10 +485,12 @@ public class PlayerMovement : MonoBehaviour
     #region RUN METHODS
     private void Run(float lerpAmount)
     {
+        float currentHorizontalSpeed = GetSelfHorizontalVelocity();
+
         //Calculate the direction we want to move in and our desired velocity
         float targetSpeed = _moveInput.x * Data.runMaxSpeed * externalRunMultiplier;
         //We can reduce are control using Lerp() this smooths changes to are direction and speed
-        targetSpeed = Mathf.Lerp(RB.velocity.x, targetSpeed, lerpAmount);
+        targetSpeed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed, lerpAmount);
 
         #region Calculate AccelRate
         float accelRate;
@@ -487,7 +514,7 @@ public class PlayerMovement : MonoBehaviour
 
         #region Conserve Momentum
         //We won't slow the player down if they are moving in their desired direction but at a greater speed than their maxSpeed
-        if (Data.doConserveMomentum && Mathf.Abs(RB.velocity.x) > Mathf.Abs(targetSpeed) && Mathf.Sign(RB.velocity.x) == Mathf.Sign(targetSpeed) && Mathf.Abs(targetSpeed) > 0.01f && LastOnGroundTime < 0)
+        if (Data.doConserveMomentum && Mathf.Abs(currentHorizontalSpeed) > Mathf.Abs(targetSpeed) && Mathf.Sign(currentHorizontalSpeed) == Mathf.Sign(targetSpeed) && Mathf.Abs(targetSpeed) > 0.01f && LastOnGroundTime < 0)
         {
             //Prevent any deceleration from happening, or in other words conserve are current momentum
             //You could experiment with allowing for the player to slightly increae their speed whilst in this "state"
@@ -496,7 +523,7 @@ public class PlayerMovement : MonoBehaviour
         #endregion
 
         //Calculate difference between current velocity and desired velocity
-        float speedDif = targetSpeed - RB.velocity.x;
+        float speedDif = targetSpeed - currentHorizontalSpeed;
         //Calculate force along x-axis to apply to thr player
 
         float movement = speedDif * accelRate;
@@ -526,6 +553,8 @@ public class PlayerMovement : MonoBehaviour
         LastOnGroundTime = 0;
 
         #region Perform Jump
+        IgnoreCurrentMovingPlatformForJump();
+
         //We increase the force applied if we are falling
         //This means we'll always feel like we jump the same amount 
         //(setting the player's Y velocity to 0 beforehand will likely work the same, but I find this more elegant :D)
@@ -734,6 +763,9 @@ public class PlayerMovement : MonoBehaviour
 
     private bool CanDash()
     {
+        if (horizontalMovementLockTimer > 0f)
+            return false;
+
         if (!IsDashing && _dashesLeft < Data.dashAmount && CanRefillDash() && !_dashRefilling)
         {
             StartCoroutine(nameof(RefillDash), 1);
@@ -852,6 +884,155 @@ public class PlayerMovement : MonoBehaviour
         return IsDropThroughPlatform(hit);
     }
 
+    private bool UpdateGroundContact()
+    {
+        currentMovingPlatform = null;
+
+        if (_groundCheckPoint == null)
+            return false;
+
+        Collider2D[] hits = Physics2D.OverlapBoxAll(_groundCheckPoint.position, _groundCheckSize, 0, _groundLayer);
+        if (!TryUseGroundHits(hits, out bool hasGround))
+        {
+            Vector2 boxCastSize = _groundCheckSize;
+            float probeDistance = Mathf.Max(0f, movingPlatformGroundProbeDistance);
+            RaycastHit2D[] castHits = Physics2D.BoxCastAll(_groundCheckPoint.position, boxCastSize, 0f, Vector2.down, probeDistance, _groundLayer);
+            hasGround = TryUseGroundHits(castHits, out _);
+        }
+
+        return hasGround;
+    }
+
+    private bool TryUseGroundHits(Collider2D[] hits, out bool hasGround)
+    {
+        hasGround = false;
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            if (TryUseGroundHit(hits[i]))
+                hasGround = true;
+        }
+
+        return hasGround;
+    }
+
+    private bool TryUseGroundHits(RaycastHit2D[] hits, out bool hasGround)
+    {
+        hasGround = false;
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            if (TryUseGroundHit(hits[i].collider))
+                hasGround = true;
+        }
+
+        return hasGround;
+    }
+
+    private bool TryUseGroundHit(Collider2D hit)
+    {
+        if (hit == null || hit.attachedRigidbody == RB || hit.transform.IsChildOf(transform))
+            return false;
+
+        if (ShouldIgnoreGroundContact(hit) || ShouldIgnoreMovingPlatformAfterJump(hit))
+            return false;
+
+        if (IsDropThroughPlatform(hit) && !ShouldUseOneWayPlatformAsGround(hit))
+            return false;
+
+        LandMovement movingPlatform = hit.GetComponentInParent<LandMovement>();
+        if (movingPlatform != null)
+            currentMovingPlatform = movingPlatform;
+
+        return true;
+    }
+
+    private bool ShouldUseOneWayPlatformAsGround(Collider2D hit)
+    {
+        const float surfaceTolerance = 0.08f;
+        return _groundCheckPoint.position.y >= hit.bounds.max.y - surfaceTolerance;
+    }
+
+    private bool ShouldIgnoreGroundContact(Collider2D hit)
+    {
+        if (hit == null)
+            return true;
+
+        if (ignoredDropThroughPlatform != null && hit == ignoredDropThroughPlatform)
+            return true;
+
+        if (playerColliders == null)
+            return false;
+
+        for (int i = 0; i < playerColliders.Length; i++)
+        {
+            Collider2D playerCollider = playerColliders[i];
+            if (playerCollider != null && Physics2D.GetIgnoreCollision(playerCollider, hit))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool ShouldIgnoreMovingPlatformAfterJump(Collider2D hit)
+    {
+        if (movingPlatformJumpIgnoreTimer <= 0f || jumpIgnoredMovingPlatform == null)
+            return false;
+
+        return hit.GetComponentInParent<LandMovement>() == jumpIgnoredMovingPlatform;
+    }
+
+    private void IgnoreCurrentMovingPlatformForJump()
+    {
+        if (currentMovingPlatform == null)
+            return;
+
+        jumpIgnoredMovingPlatform = currentMovingPlatform;
+        movingPlatformJumpIgnoreTimer = movingPlatformJumpIgnoreDuration;
+        currentMovingPlatform = null;
+    }
+
+    private void TickMovingPlatformJumpIgnore()
+    {
+        if (movingPlatformJumpIgnoreTimer <= 0f)
+            return;
+
+        movingPlatformJumpIgnoreTimer -= Time.deltaTime;
+        if (movingPlatformJumpIgnoreTimer <= 0f)
+            jumpIgnoredMovingPlatform = null;
+    }
+
+    private float GetSelfHorizontalVelocity()
+    {
+        return RB.velocity.x - GetMovingPlatformVelocity().x;
+    }
+
+    private Vector2 GetMovingPlatformVelocity()
+    {
+        if (currentMovingPlatform == null || LastOnGroundTime <= 0f)
+            return Vector2.zero;
+
+        if (IsJumping || IsWallJumping)
+            return Vector2.zero;
+
+        return currentMovingPlatform.PlatformVelocity;
+    }
+
+    private void ApplyMovingPlatformVelocity()
+    {
+        if (IsJumping || IsWallJumping)
+            return;
+
+        if (IsDashing || IsSliding || forcedHorizontalVelocityTimer > 0f)
+            return;
+
+        Vector2 platformVelocity = GetMovingPlatformVelocity();
+        if (Mathf.Abs(platformVelocity.y) <= 0.01f)
+            return;
+
+        RB.velocity = new Vector2(RB.velocity.x, platformVelocity.y);
+    }
+
     private bool TryDropThroughPlatform()
     {
         if (!IsPressingDown() || _groundCheckPoint == null)
@@ -862,7 +1043,10 @@ public class PlayerMovement : MonoBehaviour
             return false;
 
         if (dropThroughCoroutine != null)
+        {
             StopCoroutine(dropThroughCoroutine);
+            ClearIgnoredDropThroughPlatform();
+        }
 
         dropThroughCoroutine = StartCoroutine(DisablePlatformCollision(platform));
         LastPressedJumpTime = 0f;
@@ -908,8 +1092,12 @@ public class PlayerMovement : MonoBehaviour
             playerColliders = GetComponentsInChildren<Collider2D>();
 
         SetPlatformCollisionIgnored(platform, true);
+        ignoredDropThroughPlatform = platform;
         yield return new WaitForSeconds(dropThroughPlatformDuration);
         SetPlatformCollisionIgnored(platform, false);
+        if (ignoredDropThroughPlatform == platform)
+            ignoredDropThroughPlatform = null;
+
         dropThroughCoroutine = null;
     }
 
@@ -924,6 +1112,14 @@ public class PlayerMovement : MonoBehaviour
             if (playerCollider != null && playerCollider.enabled && !playerCollider.isTrigger)
                 Physics2D.IgnoreCollision(playerCollider, platform, ignored);
         }
+    }
+
+    private void ClearIgnoredDropThroughPlatform()
+    {
+        if (ignoredDropThroughPlatform != null)
+            SetPlatformCollisionIgnored(ignoredDropThroughPlatform, false);
+
+        ignoredDropThroughPlatform = null;
     }
     #endregion
 
@@ -953,6 +1149,14 @@ public class PlayerMovement : MonoBehaviour
     public void ResetExternalRunMultiplier()
     {
         externalRunMultiplier = 1f;
+    }
+
+    public void LockHorizontalMovement(float duration)
+    {
+        horizontalMovementLockTimer = Mathf.Max(horizontalMovementLockTimer, duration);
+
+        if (RB != null && forcedHorizontalVelocityTimer <= 0f)
+            RB.velocity = new Vector2(GetMovingPlatformVelocity().x, RB.velocity.y);
     }
 
     public void ForceHorizontalVelocity(float velocity, float duration)

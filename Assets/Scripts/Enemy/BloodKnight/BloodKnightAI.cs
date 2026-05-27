@@ -2,7 +2,7 @@ using System.Collections;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
-public class BloodKnightAI : MonoBehaviour
+public class BloodKnightAI : MonoBehaviour, IParryReceiver
 {
     private enum State
     {
@@ -467,6 +467,7 @@ public class BloodKnightAI : MonoBehaviour
         timer = attackPrepTime;
         Stop();
         Play(idleStateName);
+        attack?.PlayParryCue(transform);
     }
 
     private void TickAttackPrep()
@@ -504,12 +505,6 @@ public class BloodKnightAI : MonoBehaviour
     private void TickAttack()
     {
         Stop();
-
-        if (attack != null && attack.WasParried)
-        {
-            StartParried();
-            return;
-        }
 
         timer -= Time.deltaTime;
         if (timer > 0f)
@@ -573,6 +568,14 @@ public class BloodKnightAI : MonoBehaviour
         StopAttackDash();
         Stop();
         Play(parriedStateName);
+    }
+
+    public void OnParried(PlayerParry parry, Vector3 attackerPosition)
+    {
+        if (state == State.Parried)
+            return;
+
+        StartParried();
     }
 
     private void TickParried()

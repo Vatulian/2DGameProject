@@ -61,6 +61,7 @@ public class PlayerAttack : MonoBehaviour
 
         cooldownTimer = attackCooldown;
         attackLockTimer = Mathf.Max(attackLockDuration, attackCooldown * 0.5f);
+        playerMovement?.LockHorizontalMovement(attackLockTimer);
 
         if (animationController != null) animationController.PlayAttack();
         else if (anim != null) anim.SetTrigger("Attack");

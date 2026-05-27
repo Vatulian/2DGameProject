@@ -172,8 +172,8 @@ public class LedgeClimb : MonoBehaviour
         Vector2 lowerOrigin = origin + Vector2.up * lowerRayHeight;
         Vector2 upperOrigin = origin + Vector2.up * upperRayHeight;
 
-        RaycastHit2D lowerHit = Physics2D.Raycast(lowerOrigin, direction, rayDistance, ledgeLayer);
-        bool upperBlocked = Physics2D.Raycast(upperOrigin, direction, rayDistance, ledgeLayer);
+        RaycastHit2D lowerHit = CastLedgeRay(lowerOrigin, direction, rayDistance);
+        bool upperBlocked = CastLedgeRay(upperOrigin, direction, rayDistance).collider != null;
 
         if (lowerHit.collider == null || upperBlocked)
             return;
@@ -239,7 +239,46 @@ public class LedgeClimb : MonoBehaviour
 
     private RaycastHit2D CastSurfaceProbe(Vector2 probeStart, Vector2 probeEnd)
     {
-        return Physics2D.Raycast(probeStart, Vector2.down, Vector2.Distance(probeStart, probeEnd), ledgeLayer);
+        return CastLedgeRay(probeStart, Vector2.down, Vector2.Distance(probeStart, probeEnd));
+    }
+
+    private RaycastHit2D CastLedgeRay(Vector2 origin, Vector2 direction, float distance)
+    {
+        RaycastHit2D[] hits = Physics2D.RaycastAll(origin, direction, distance, ledgeLayer);
+        RaycastHit2D closestHit = default;
+        float closestDistance = float.PositiveInfinity;
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            RaycastHit2D hit = hits[i];
+            if (hit.collider == null || !IsValidLedgeCollider(hit.collider))
+                continue;
+
+            if (hit.distance < closestDistance)
+            {
+                closestHit = hit;
+                closestDistance = hit.distance;
+            }
+        }
+
+        return closestHit;
+    }
+
+    private bool IsValidLedgeCollider(Collider2D hit)
+    {
+        if (hit == null)
+            return false;
+
+        if (bodyCollider != null && Physics2D.GetIgnoreCollision(bodyCollider, hit))
+            return false;
+
+        if (hit.GetComponentInParent<LandMovement>() != null)
+            return false;
+
+        if (hit.GetComponent<PlatformEffector2D>() != null || hit.GetComponentInParent<PlatformEffector2D>() != null)
+            return false;
+
+        return true;
     }
 
     private Bounds GetBodyBounds()

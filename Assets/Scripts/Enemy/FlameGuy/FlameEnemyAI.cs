@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(Rigidbody2D))]
-public class FlameEnemyAI : MonoBehaviour
+public class FlameEnemyAI : MonoBehaviour, IParryReceiver
 {
     private const string EnemyAttackLayerName = "EnemyAttack";
 
@@ -65,6 +65,7 @@ public class FlameEnemyAI : MonoBehaviour
     [SerializeField] private float damageInterval = 0.25f;
     [SerializeField] private float recoveryTime = 1.1f;
     [SerializeField] private int damage = 1;
+    [SerializeField] private ParryAttackSettings flameParry = new ParryAttackSettings();
     [SerializeField] private float flameKnockbackSpeed = 13f;
     [SerializeField] private float flameKnockbackDuration = 0.22f;
     [SerializeField] private float flameKnockbackUpwardVelocity = 2.5f;
@@ -419,6 +420,7 @@ public class FlameEnemyAI : MonoBehaviour
 
         ApplyFacing();
         PlayOnce("prep attack");
+        flameParry?.PlayCue(this, flameAreaTf != null ? flameAreaTf : transform);
     }
 
     private void TickPrep()
@@ -669,6 +671,9 @@ public class FlameEnemyAI : MonoBehaviour
 
         float previousHealth = targetHealth.CurrentHealth;
         Vector3 hitPoint = hitCollider.bounds.ClosestPoint(flameArea.bounds.center);
+        if (flameParry != null && flameParry.TryParry(hitCollider, GetFlameKnockbackSource(targetHealth.transform.position), this))
+            return;
+
         targetHealth.TakeDamageAt(damage, hitPoint);
 
         if (targetHealth.IsDead || targetHealth.CurrentHealth >= previousHealth)
@@ -717,6 +722,22 @@ public class FlameEnemyAI : MonoBehaviour
     {
         // FlameGuy is intentionally stubborn: this method exists for legacy callers,
         // but hit reactions should not knock him back or cancel committed attacks.
+    }
+
+    public void OnParried(PlayerParry parry, Vector3 attackerPosition)
+    {
+        if (state != State.Prep && state != State.Flame)
+            return;
+
+        if (flameArea != null)
+            flameArea.enabled = false;
+
+        flameTargetsInside.Clear();
+        currentFlameTargets.Clear();
+        Stop();
+        state = State.Recovery;
+        timer = recoveryTime;
+        PlayOnce("idle");
     }
 
     public void AlertFromDamage()

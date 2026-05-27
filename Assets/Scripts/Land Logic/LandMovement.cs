@@ -1,5 +1,6 @@
 using UnityEngine;
 
+[DefaultExecutionOrder(-50)]
 public class LandMovement : MonoBehaviour
 {
     private const float MinPathDistance = 0.001f;
@@ -22,7 +23,8 @@ public class LandMovement : MonoBehaviour
     private float pathProgress;
     private int direction = 1;
 
-    public Vector3 PlatformSpeed { get; private set; } // We just made it readable.
+    public Vector3 PlatformSpeed { get; private set; } // Per-fixed-step movement delta.
+    public Vector3 PlatformVelocity => Time.fixedDeltaTime > 0f ? PlatformSpeed / Time.fixedDeltaTime : Vector3.zero;
 
     private void Awake()
     {

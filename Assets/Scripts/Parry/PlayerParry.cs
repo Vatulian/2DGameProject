@@ -27,7 +27,35 @@ public class PlayerParry : MonoBehaviour
     private float cooldownTimer;
 
     public bool IsParryActive => activeTimer > 0f;
-    public bool IsOnCooldown => cooldownTimer > 0f;
+
+    public static bool TryParryHit(Collider2D playerHit, Vector3 attackerPosition, bool canBeParried = true, Component parrySource = null)
+    {
+        if (!canBeParried || playerHit == null)
+            return false;
+
+        PlayerParry parry = playerHit.GetComponent<PlayerParry>() ?? playerHit.GetComponentInParent<PlayerParry>();
+        if (parry == null || !parry.TryParry(attackerPosition))
+            return false;
+
+        NotifyParryReceiver(parrySource, parry, attackerPosition);
+        return true;
+    }
+
+    private static void NotifyParryReceiver(Component parrySource, PlayerParry parry, Vector3 attackerPosition)
+    {
+        if (parrySource == null)
+            return;
+
+        MonoBehaviour[] behaviours = parrySource.GetComponentsInParent<MonoBehaviour>();
+        for (int i = 0; i < behaviours.Length; i++)
+        {
+            if (behaviours[i] is IParryReceiver receiver)
+            {
+                receiver.OnParried(parry, attackerPosition);
+                return;
+            }
+        }
+    }
 
     private void Awake()
     {
@@ -69,15 +97,12 @@ public class PlayerParry : MonoBehaviour
         cooldownTimer = cooldownTime;
 
         if (lockMovementTime > 0f)
-            movement?.SetExternalRunMultiplier(0f);
+            movement?.LockHorizontalMovement(lockMovementTime);
 
         PlayParryState(parryPoseStateName, activeTime);
 
         if (SoundManager.instance && parryStartSound)
             SoundManager.instance.PlaySound(parryStartSound);
-
-        if (lockMovementTime > 0f)
-            Invoke(nameof(ReleaseMovementLock), lockMovementTime);
 
         return true;
     }
@@ -88,14 +113,15 @@ public class PlayerParry : MonoBehaviour
             return false;
 
         activeTimer = 0f;
+        cooldownTimer = 0f;
         FaceAttacker(attackerPosition);
+        movement?.LockHorizontalMovement(successAnimationLockTime);
 
         PlayParryState(parrySuccessStateName, successAnimationLockTime);
 
         if (SoundManager.instance && parrySuccessSound)
             SoundManager.instance.PlaySound(parrySuccessSound);
 
-        ReleaseMovementLock();
         return true;
     }
 
@@ -107,11 +133,6 @@ public class PlayerParry : MonoBehaviour
         float direction = attackerPosition.x - transform.position.x;
         if (!Mathf.Approximately(direction, 0f))
             movement.CheckDirectionToFace(direction > 0f);
-    }
-
-    private void ReleaseMovementLock()
-    {
-        movement?.ResetExternalRunMultiplier();
     }
 
     private void PlayParryState(string stateName, float lockDuration)

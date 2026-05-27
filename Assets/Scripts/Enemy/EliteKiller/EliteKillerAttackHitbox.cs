@@ -41,7 +41,7 @@ public class EliteKillerAttackHitbox : MonoBehaviour
     [SerializeField] private bool applyKnockback = true;
 
     [Header("Parry")]
-    [SerializeField] private bool canBeParried = true;
+    [SerializeField] private ParryAttackSettings parry = new ParryAttackSettings();
 
     private readonly HashSet<Collider2D> hitTargets = new HashSet<Collider2D>();
     private readonly HashSet<Health> hitHealthTargets = new HashSet<Health>();
@@ -52,7 +52,6 @@ public class EliteKillerAttackHitbox : MonoBehaviour
     private Coroutine timedWindowRoutine;
     private Coroutine chainRoutine;
 
-    public bool WasParried { get; private set; }
     public float MeleeForwardInnerReach => Mathf.Max(0f, Mathf.Abs(meleeRightFacingOffset.x) - meleeSize.x * 0.5f);
     public float MeleeForwardCenter => Mathf.Abs(meleeRightFacingOffset.x);
     public float MeleeForwardReach => Mathf.Abs(meleeRightFacingOffset.x) + meleeSize.x * 0.5f;
@@ -76,11 +75,15 @@ public class EliteKillerAttackHitbox : MonoBehaviour
     public void Begin(Transform attackOwner, int attackFacing)
     {
         owner = attackOwner;
-        WasParried = false;
         hitTargets.Clear();
         hitHealthTargets.Clear();
         SetFacing(attackFacing);
         DisableHitbox();
+    }
+
+    public void PlayParryCue(Transform fallbackPoint)
+    {
+        parry?.PlayCue(this, fallbackPoint);
     }
 
     public void SetFacing(int attackFacing)
@@ -233,7 +236,8 @@ public class EliteKillerAttackHitbox : MonoBehaviour
         if (!CanTarget(other))
             return;
 
-        if (TryParry(other))
+        Vector3 attackerPosition = owner != null ? owner.position : transform.position;
+        if (parry != null && parry.TryParry(other, attackerPosition, this))
         {
             hitTargets.Add(other);
             DisableHitbox();
@@ -262,19 +266,6 @@ public class EliteKillerAttackHitbox : MonoBehaviour
             return (playerLayer.value & (1 << other.gameObject.layer)) != 0;
 
         return other.CompareTag("Player") || other.GetComponentInParent<PlayerMovement>() != null;
-    }
-
-    private bool TryParry(Collider2D playerHit)
-    {
-        if (!canBeParried)
-            return false;
-
-        PlayerParry parry = playerHit.GetComponent<PlayerParry>() ?? playerHit.GetComponentInParent<PlayerParry>();
-        if (parry == null || !parry.TryParry(owner != null ? owner.position : transform.position))
-            return false;
-
-        WasParried = true;
-        return true;
     }
 
     private void ApplyShape(Vector2 size, Vector2 rightFacingOffset)

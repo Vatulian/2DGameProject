@@ -1,11 +1,12 @@
 using UnityEngine;
 
-public class MeleeEnemy : MonoBehaviour
+public class MeleeEnemy : MonoBehaviour, IParryReceiver
 {
     [Header("Attack Parameters")]
     [SerializeField] private float attackCooldown;
     [SerializeField] private float attackRange;
     [SerializeField] private int damage;
+    [SerializeField] private ParryAttackSettings attackParry = new ParryAttackSettings();
 
     [Header("Chase Parameters")]
     [SerializeField] private float chaseRange;
@@ -25,6 +26,7 @@ public class MeleeEnemy : MonoBehaviour
     // References
     private Animator anim;
     private Health playerHealth;
+    private Collider2D playerHitCollider;
     private EnemyPatrol enemyPatrol;
     private Transform player;
 
@@ -128,6 +130,7 @@ public class MeleeEnemy : MonoBehaviour
         anim.SetTrigger("meleeAttackTrigger");
         anim.SetBool("meleeAttackBool", true);// Sald�r� tetikleyicisini ayarla
         SoundManager.instance.PlaySound(attackSound);
+        attackParry?.PlayCue(this, transform);
     }
 
 
@@ -150,6 +153,7 @@ public class MeleeEnemy : MonoBehaviour
         if (hit.collider != null)
         {
             playerHealth = hit.transform.GetComponent<Health>();
+            playerHitCollider = hit.collider;
         }
 
         return hit.collider != null;
@@ -174,7 +178,8 @@ public class MeleeEnemy : MonoBehaviour
     {
         if (playerHealth != null && isAttacking) //can make idamagable interface
         {
-            playerHealth.TakeDamage(damage);
+            if (attackParry == null || !attackParry.TryParry(playerHitCollider, transform.position, this))
+                playerHealth.TakeDamage(damage);
         }
         isAttacking = false; // after attacking, turn back to normal mode
 
@@ -185,6 +190,18 @@ public class MeleeEnemy : MonoBehaviour
         else
         {
             anim.SetBool("Idle", true); // after attacking, stance "idle"
+        }
+    }
+
+    public void OnParried(PlayerParry parry, Vector3 attackerPosition)
+    {
+        isAttacking = false;
+        playerHitCollider = null;
+
+        if (anim != null)
+        {
+            anim.SetBool("meleeAttackBool", false);
+            anim.SetBool("Idle", true);
         }
     }
 

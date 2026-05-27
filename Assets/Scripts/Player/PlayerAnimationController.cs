@@ -85,8 +85,8 @@ public class PlayerAnimationController : MonoBehaviour
             return;
         }
 
-        bool isRunning = Mathf.Abs(rb != null ? rb.velocity.x : 0f) > runVelocityThreshold;
         bool isGrounded = IsGroundedForAnimation();
+        bool isRunning = IsRunningForAnimation(isGrounded);
 
         anim.SetBool(RunHash, isRunning);
         anim.SetBool(GroundedHash, isGrounded);
@@ -197,7 +197,7 @@ public class PlayerAnimationController : MonoBehaviour
         {
             bool isGrounded = IsGroundedForAnimation();
 
-            bool isRunning = Mathf.Abs(rb != null ? rb.velocity.x : 0f) > runVelocityThreshold;
+            bool isRunning = IsRunningForAnimation(isGrounded);
             stateName = GetLocomotionStateName(isGrounded, isRunning);
         }
 
@@ -297,6 +297,14 @@ public class PlayerAnimationController : MonoBehaviour
                && !movement.IsDashing
                && !movement.IsSliding
                && movement.LastOnGroundTime > 0f;
+    }
+
+    private bool IsRunningForAnimation(bool isGrounded)
+    {
+        if (isGrounded && movement != null)
+            return Mathf.Abs(movement.HorizontalInput) > 0.1f;
+
+        return Mathf.Abs(rb != null ? rb.velocity.x : 0f) > runVelocityThreshold;
     }
 
     private string GetLocomotionStateName(bool isGrounded, bool isRunning)

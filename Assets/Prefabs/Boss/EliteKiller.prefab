@@ -468,7 +468,13 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   applyKnockback: 1
-  canBeParried: 0
+  parry:
+    canBeParried: 0
+    cuePoint: {fileID: 0}
+    cueOffset: {x: 0, y: 0, z: 0}
+    parryableCuePrefab: {fileID: 0}
+    unparryableCuePrefab: {fileID: 0}
+    cueLifetime: 1
 --- !u!1 &3305015326687586258
 GameObject:
   m_ObjectHideFlags: 0
@@ -744,7 +750,13 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   applyKnockback: 1
-  canBeParried: 1
+  parry:
+    canBeParried: 1
+    cuePoint: {fileID: 0}
+    cueOffset: {x: 0, y: 0, z: 0}
+    parryableCuePrefab: {fileID: 0}
+    unparryableCuePrefab: {fileID: 0}
+    cueLifetime: 1
 --- !u!1 &7113728838685544210
 GameObject:
   m_ObjectHideFlags: 0

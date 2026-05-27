@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class FlyingCharger : MonoBehaviour
+public class FlyingCharger : MonoBehaviour, IParryReceiver
 {
     private enum State
     {
@@ -26,6 +26,7 @@ public class FlyingCharger : MonoBehaviour
     [SerializeField] private float windupTime = 0.4f;
     [SerializeField] private float maxChargeTime = 1.2f;
     [SerializeField] private int damage = 1;
+    [SerializeField] private ParryAttackSettings chargeParry = new ParryAttackSettings();
 
     [Header("Field of View")]
     [SerializeField] private float viewDistance = 8f;
@@ -107,6 +108,7 @@ public class FlyingCharger : MonoBehaviour
             rb.velocity = Vector2.zero;
 
         FaceTowards(storedTargetPos);
+        chargeParry?.PlayCue(this, model != null ? model : transform);
     }
 
     private void HandleWindup()
@@ -245,10 +247,24 @@ public class FlyingCharger : MonoBehaviour
 
         if (collision.gameObject.CompareTag("Player") && !IsPlayerInvulnerable())
         {
-            Health hp = collision.gameObject.GetComponent<Health>();
-            if (hp != null)
-                hp.TakeDamage(damage);
+            if (chargeParry == null || !chargeParry.TryParry(collision.collider, transform.position, this))
+            {
+                Health hp = collision.gameObject.GetComponent<Health>();
+                if (hp != null)
+                    hp.TakeDamage(damage);
+            }
         }
+
+        state = State.Return;
+    }
+
+    public void OnParried(PlayerParry parry, Vector3 attackerPosition)
+    {
+        if (state != State.Charge)
+            return;
+
+        if (rb != null)
+            rb.velocity = Vector2.zero;
 
         state = State.Return;
     }

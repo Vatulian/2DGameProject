@@ -18,7 +18,7 @@ public class BloodKnightAttack : MonoBehaviour
     [SerializeField] private bool applyKnockback = true;
 
     [Header("Parry")]
-    [SerializeField] private bool canBeParried = true;
+    [SerializeField] private ParryAttackSettings parry = new ParryAttackSettings();
 
     private readonly HashSet<Collider2D> hitTargets = new HashSet<Collider2D>();
     private readonly HashSet<Health> hitHealthTargets = new HashSet<Health>();
@@ -27,7 +27,6 @@ public class BloodKnightAttack : MonoBehaviour
     private int facing = 1;
     private bool active;
 
-    public bool WasParried { get; private set; }
     public float ForwardReach => Mathf.Abs(rightFacingOffset.x) + hitboxSize.x * 0.5f;
 
     private void Awake()
@@ -48,11 +47,15 @@ public class BloodKnightAttack : MonoBehaviour
     public void Begin(Transform attackOwner, Collider2D _, int __)
     {
         owner = attackOwner;
-        WasParried = false;
         hitTargets.Clear();
         hitHealthTargets.Clear();
         DisableHitbox();
         SetFacing(__);
+    }
+
+    public void PlayParryCue(Transform fallbackPoint)
+    {
+        parry?.PlayCue(this, fallbackPoint);
     }
 
     public void SetFacing(int facing)
@@ -100,7 +103,8 @@ public class BloodKnightAttack : MonoBehaviour
         if ((playerLayer.value & (1 << other.gameObject.layer)) == 0)
             return;
 
-        if (TryParry(other))
+        Vector3 attackerPosition = owner != null ? owner.position : transform.position;
+        if (parry != null && parry.TryParry(other, attackerPosition, this))
         {
             hitTargets.Add(other);
             DisableHitbox();
@@ -120,19 +124,6 @@ public class BloodKnightAttack : MonoBehaviour
             health.TakeDamage(damage, owner != null ? owner.position : transform.position);
         else
             health.TakeDamage(damage);
-    }
-
-    private bool TryParry(Collider2D playerHit)
-    {
-        if (!canBeParried)
-            return false;
-
-        PlayerParry parry = playerHit.GetComponent<PlayerParry>() ?? playerHit.GetComponentInParent<PlayerParry>();
-        if (parry == null || !parry.TryParry(owner != null ? owner.position : transform.position))
-            return false;
-
-        WasParried = true;
-        return true;
     }
 
     private void ApplyHitboxShape()
