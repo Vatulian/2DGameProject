@@ -80,6 +80,7 @@ public class PlayerData : ScriptableObject
     [Header("Slide")]
     public float slideSpeed; //Use a negative value for downward wall slide, e.g. -3
     public float slideAccel;
+    [Range(0f, 0.5f)] public float wallSlideReleaseGraceTime = 0.12f; //Keeps wall slide/jump/dash available briefly after letting go of the wall input
 
     [Header("Assists")]
     [Range(0.01f, 0.5f)] public float coyoteTime; //Grace period after falling off a platform, where you can still jump
@@ -97,7 +98,6 @@ public class PlayerData : ScriptableObject
     [Space(5)]
     public float dashEndTime; //Time after you finish the inital drag phase, smoothing the transition back to idle (or any standard state)
     public Vector2 dashEndSpeed; //Slows down player, makes dash feel more responsive
-    [Range(0f, 1f)] public float dashEndRunLerp; //Slows the affect of player movement while dashing
     [Space(5)]
     public float dashRefillTime;
     [Space(5)]

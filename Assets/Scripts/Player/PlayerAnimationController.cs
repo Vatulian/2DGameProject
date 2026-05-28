@@ -314,7 +314,7 @@ public class PlayerAnimationController : MonoBehaviour
             if (movement.IsDashing && !string.IsNullOrWhiteSpace(dashStateName))
                 return dashStateName;
 
-            if (movement.IsSliding && !string.IsNullOrWhiteSpace(wallSlideStateName))
+            if ((movement.IsSliding || movement.ShouldShowWallSlideAnimation) && !string.IsNullOrWhiteSpace(wallSlideStateName))
                 return wallSlideStateName;
         }
 

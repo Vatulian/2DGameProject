@@ -41,6 +41,8 @@ public class PlayerMovement : MonoBehaviour
     private int _lastWallJumpDir;
     private int _lastWallJumpWallDir;
     private bool _releasedLastWallJumpWall = true;
+    private float _wallSlideGraceTimer;
+    private int _lastWallSlideWallDir;
     private bool _isTouchingWallRight;
     private bool _isTouchingWallLeft;
     private bool _hasGroundContact;
@@ -85,6 +87,8 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private float dropThroughPushSpeed = 2f;
     [SerializeField] private float movingPlatformGroundProbeDistance = 0.08f;
     [SerializeField] private float movingPlatformJumpIgnoreDuration = 0.12f;
+    [SerializeField] private float oneWayGroundProbeDistance = 0.08f;
+    [SerializeField] private float oneWayJumpLedgeBlockDuration = 0.18f;
     #endregion
 
     #region LAYERS & TAGS
@@ -106,10 +110,19 @@ public class PlayerMovement : MonoBehaviour
     private Collider2D ignoredDropThroughPlatform;
     private LedgeClimb ledgeClimb;
     private LandMovement currentMovingPlatform;
+    private bool currentGroundIsDropThroughPlatform;
     private LandMovement jumpIgnoredMovingPlatform;
     private float movingPlatformJumpIgnoreTimer;
+    private float oneWayJumpLedgeBlockTimer;
 
     #endregion
+
+    public bool IsLedgeGrabBlocked => oneWayJumpLedgeBlockTimer > 0f;
+    public bool ShouldShowWallSlideAnimation => LastOnGroundTime <= 0f
+        && !IsDashing
+        && !IsWallJumping
+        && HasCurrentWallContact()
+        && !IsPressingAwayFromWall();
 
     private void Awake()
     {
@@ -156,6 +169,7 @@ public class PlayerMovement : MonoBehaviour
             airAttackRestartGraceTimer -= Time.deltaTime;
 
         TickMovingPlatformJumpIgnore();
+        TickOneWayJumpLedgeBlock();
 
         #region TIMERS
         LastOnGroundTime -= Time.deltaTime;
@@ -241,6 +255,8 @@ public class PlayerMovement : MonoBehaviour
         _wasOnWall = onWallNow;
         #endregion
 
+        UpdateWallSlideGrace();
+
         #region JUMP CHECKS
         if (IsJumping && RB.velocity.y < 0)
         {
@@ -320,8 +336,8 @@ public class PlayerMovement : MonoBehaviour
             //Freeze game for split second. Adds juiciness and a bit of forgiveness over directional input
             Sleep(Data.dashSleepTime);
 
-            //Dash always goes to the facing direction
-            _lastDashDir = IsFacingRight ? Vector2.right : Vector2.left;
+            _lastDashDir = GetDashDirection();
+            CheckDirectionToFace(_lastDashDir.x > 0f);
 
             IsDashing = true;
             IsJumping = false;
@@ -426,10 +442,6 @@ public class PlayerMovement : MonoBehaviour
                 Run(Data.wallJumpRunLerp);
             else
                 Run(1);
-        }
-        else if (_isDashAttacking)
-        {
-            Run(Data.dashEndRunLerp);
         }
 
         ApplyMovingPlatformVelocity();
@@ -553,6 +565,7 @@ public class PlayerMovement : MonoBehaviour
         LastOnGroundTime = 0;
 
         #region Perform Jump
+        BlockLedgeGrabAfterOneWayJump();
         IgnoreCurrentMovingPlatformForJump();
 
         //We increase the force applied if we are falling
@@ -657,7 +670,7 @@ public class PlayerMovement : MonoBehaviour
 
         _isDashAttacking = false;
 
-        //Begins the "end" of our dash where we return some control to the player but still limit run acceleration (see Update() and Run())
+        //Begin the dash end phase. Directional control returns after the dash fully ends.
         SetGravityScale(Data.gravityScale);
         RB.velocity = Data.dashEndSpeed * dir.normalized;
 
@@ -774,6 +787,21 @@ public class PlayerMovement : MonoBehaviour
         return _dashesLeft > 0;
     }
 
+    private Vector2 GetDashDirection()
+    {
+        int wallDir = 0;
+
+        if (IsWallJumping)
+            wallDir = _lastWallJumpWallDir != 0 ? _lastWallJumpWallDir : GetWallJumpWallDirection();
+        else if (IsSliding || CanSlide())
+            wallDir = GetWallSlideWallDirection();
+
+        if (wallDir != 0)
+            return wallDir > 0 ? Vector2.left : Vector2.right;
+
+        return IsFacingRight ? Vector2.right : Vector2.left;
+    }
+
     private bool CanRefillDash()
     {
         return LastOnGroundTime > 0 || CanRefillDashFromWall();
@@ -789,8 +817,8 @@ public class PlayerMovement : MonoBehaviour
 
     public bool CanSlide()
     {
-        return LastOnWallTime > 0
-            && IsPressingIntoWall()
+        return GetWallSlideWallDirection() != 0
+            && ((HasCurrentWallContact() && IsPressingIntoWall()) || CanUseWallSlideGrace())
             && !IsJumping
             && !IsWallJumping
             && !IsDashing
@@ -807,6 +835,26 @@ public class PlayerMovement : MonoBehaviour
         return Mathf.Sign(_moveInput.x) == wallDirection && Mathf.Abs(_moveInput.x) > 0.1f;
     }
 
+    private bool IsPressingAwayFromWall()
+    {
+        int wallDirection = _lastWallSlideWallDir != 0 ? _lastWallSlideWallDir : GetCurrentWallDirection();
+
+        if (wallDirection == 0)
+            return false;
+
+        return Mathf.Sign(_moveInput.x) == -wallDirection && Mathf.Abs(_moveInput.x) > 0.1f;
+    }
+
+    private bool HasHorizontalInput()
+    {
+        return Mathf.Abs(_moveInput.x) > 0.1f;
+    }
+
+    private bool CanUseWallSlideGrace()
+    {
+        return _wallSlideGraceTimer > 0f && !HasHorizontalInput();
+    }
+
     private int GetCurrentWallDirection()
     {
         if (_isTouchingWallRight || LastOnWallRightTime > 0)
@@ -814,6 +862,23 @@ public class PlayerMovement : MonoBehaviour
 
         if (_isTouchingWallLeft || LastOnWallLeftTime > 0)
             return -1;
+
+        return 0;
+    }
+
+    private bool HasCurrentWallContact()
+    {
+        return _isTouchingWallRight || _isTouchingWallLeft;
+    }
+
+    private int GetWallSlideWallDirection()
+    {
+        int currentWallDir = GetCurrentWallDirection();
+        if (currentWallDir != 0)
+            return currentWallDir;
+
+        if (_wallSlideGraceTimer > 0f)
+            return _lastWallSlideWallDir;
 
         return 0;
     }
@@ -839,7 +904,30 @@ public class PlayerMovement : MonoBehaviour
         if (LastOnWallLeftTime > 0)
             return -1;
 
+        if (_wallSlideGraceTimer > 0f)
+            return _lastWallSlideWallDir;
+
         return 0;
+    }
+
+    private void UpdateWallSlideGrace()
+    {
+        if (_wallSlideGraceTimer > 0f)
+            _wallSlideGraceTimer -= Time.deltaTime;
+
+        if (LastOnGroundTime > 0 || IsJumping || IsWallJumping || IsDashing || IsPressingAwayFromWall()
+            || (!HasCurrentWallContact() && HasHorizontalInput()))
+        {
+            _wallSlideGraceTimer = 0f;
+            _lastWallSlideWallDir = 0;
+            return;
+        }
+
+        if (!IsSliding || !HasCurrentWallContact() || !IsPressingIntoWall())
+            return;
+
+        _wallSlideGraceTimer = Data.wallSlideReleaseGraceTime;
+        _lastWallSlideWallDir = GetCurrentWallDirection();
     }
 
     private void UpdateLastWallJumpWallRelease()
@@ -887,6 +975,7 @@ public class PlayerMovement : MonoBehaviour
     private bool UpdateGroundContact()
     {
         currentMovingPlatform = null;
+        currentGroundIsDropThroughPlatform = false;
 
         if (_groundCheckPoint == null)
             return false;
@@ -937,8 +1026,12 @@ public class PlayerMovement : MonoBehaviour
         if (ShouldIgnoreGroundContact(hit) || ShouldIgnoreMovingPlatformAfterJump(hit))
             return false;
 
-        if (IsDropThroughPlatform(hit) && !ShouldUseOneWayPlatformAsGround(hit))
+        bool isDropThroughPlatform = IsDropThroughPlatform(hit);
+        if (isDropThroughPlatform && !ShouldUseOneWayPlatformAsGround(hit))
             return false;
+
+        if (isDropThroughPlatform)
+            currentGroundIsDropThroughPlatform = true;
 
         LandMovement movingPlatform = hit.GetComponentInParent<LandMovement>();
         if (movingPlatform != null)
@@ -949,8 +1042,29 @@ public class PlayerMovement : MonoBehaviour
 
     private bool ShouldUseOneWayPlatformAsGround(Collider2D hit)
     {
-        const float surfaceTolerance = 0.08f;
-        return _groundCheckPoint.position.y >= hit.bounds.max.y - surfaceTolerance;
+        if (_groundCheckPoint == null)
+            return false;
+
+        float probeDistance = Mathf.Max(0.01f, oneWayGroundProbeDistance);
+        RaycastHit2D[] hits = Physics2D.BoxCastAll(
+            _groundCheckPoint.position,
+            _groundCheckSize,
+            0f,
+            Vector2.down,
+            probeDistance,
+            _groundLayer);
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            RaycastHit2D groundHit = hits[i];
+            if (groundHit.collider != hit)
+                continue;
+
+            if (groundHit.normal.y >= 0.5f)
+                return true;
+        }
+
+        return false;
     }
 
     private bool ShouldIgnoreGroundContact(Collider2D hit)
@@ -1000,6 +1114,22 @@ public class PlayerMovement : MonoBehaviour
         movingPlatformJumpIgnoreTimer -= Time.deltaTime;
         if (movingPlatformJumpIgnoreTimer <= 0f)
             jumpIgnoredMovingPlatform = null;
+    }
+
+    private void BlockLedgeGrabAfterOneWayJump()
+    {
+        if (!currentGroundIsDropThroughPlatform)
+            return;
+
+        oneWayJumpLedgeBlockTimer = oneWayJumpLedgeBlockDuration;
+    }
+
+    private void TickOneWayJumpLedgeBlock()
+    {
+        if (oneWayJumpLedgeBlockTimer <= 0f)
+            return;
+
+        oneWayJumpLedgeBlockTimer -= Time.deltaTime;
     }
 
     private float GetSelfHorizontalVelocity()

@@ -58,6 +58,7 @@ MonoBehaviour:
   wallClingTime: 0.15
   slideSpeed: -3
   slideAccel: 8
+  wallSlideReleaseGraceTime: 0.5
   coyoteTime: 0.201
   wallCoyoteTime: 0.006
   jumpInputBufferTime: 0.201
@@ -67,6 +68,5 @@ MonoBehaviour:
   dashAttackTime: 0.15
   dashEndTime: 0.15
   dashEndSpeed: {x: 15, y: 15}
-  dashEndRunLerp: 0.5
   dashRefillTime: 0.1
   dashInputBufferTime: 0.1

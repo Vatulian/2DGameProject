@@ -144,6 +144,9 @@ public class LedgeClimb : MonoBehaviour
         if (playerMovement.IsDashing || playerMovement.IsWallJumping)
             return false;
 
+        if (playerMovement.IsLedgeGrabBlocked)
+            return false;
+
         if ((rangedAttack != null && rangedAttack.IsAttacking)
             || (meleeAttack != null && meleeAttack.IsAttacking)
             || (parry != null && parry.IsParryActive))
