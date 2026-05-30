@@ -11,6 +11,7 @@ public class Health : MonoBehaviour
     [SerializeField] private float startingHealth;
     public float currentHealth { get; private set; }
     public float CurrentHealth => currentHealth;
+    public float StartingHealth => startingHealth;
     private Animator anim;
     private Rigidbody2D rb;
     private bool dead;
@@ -278,6 +279,11 @@ public class Health : MonoBehaviour
     }
 
     public bool Invulnerable => invulnerable;
+
+    public void SetInvulnerable(bool value)
+    {
+        invulnerable = value;
+    }
 
     public void SetEnemyCollisionIgnored(bool ignored)
     {
