@@ -58,6 +58,12 @@ public class ColossalBossAI : MonoBehaviour, IBossEncounterTarget
     [Tooltip("Fallback duration if the Buff animation does not fire EndBuff.")]
     [SerializeField] private float phaseTwoBuffDuration = 1.4f;
 
+    [Header("Death Drop")]
+    [SerializeField] private GameObject deathDropPrefab;
+    [SerializeField] private Transform deathDropSpawnPoint;
+    [SerializeField] private Vector2 deathDropOffset = new Vector2(0f, 0.75f);
+    [SerializeField] private bool dropOnlyOnce = true;
+
     [Header("Animation States")]
     [SerializeField] private string wakeStateName = "Wake";
     [SerializeField] private string idleStateName = "Idle";
@@ -86,6 +92,7 @@ public class ColossalBossAI : MonoBehaviour, IBossEncounterTarget
     private bool phaseTwoBuffing;
     private bool phaseTwoBuffEnded;
     private Coroutine phaseTwoBuffRoutine;
+    private bool deathDropSpawned;
     private Transform fallbackPlayer;
     private ColossalBossAttackHitbox activeAttackHitbox;
 
@@ -231,6 +238,7 @@ public class ColossalBossAI : MonoBehaviour, IBossEncounterTarget
         phaseTwoBuffing = false;
         phaseTwoBuffEnded = false;
         nextAttackIsRange = false;
+        deathDropSpawned = false;
         StopPhaseTwoBuffRoutine();
         SetActorPosition(encounterSpawnPosition);
         DisableAllHitboxes();
@@ -516,7 +524,25 @@ public class ColossalBossAI : MonoBehaviour, IBossEncounterTarget
         if (bodyCollider != null)
             bodyCollider.enabled = false;
 
+        SpawnDeathDrop();
         Play(deathStateName);
+    }
+
+    private void SpawnDeathDrop()
+    {
+        if (deathDropPrefab == null)
+            return;
+
+        if (dropOnlyOnce && deathDropSpawned)
+            return;
+
+        Vector3 spawnPosition = deathDropSpawnPoint != null
+            ? deathDropSpawnPoint.position
+            : GetActorPosition();
+
+        spawnPosition += (Vector3)deathDropOffset;
+        Instantiate(deathDropPrefab, spawnPosition, Quaternion.identity);
+        deathDropSpawned = true;
     }
 
     private Transform GetPlayerTransform()

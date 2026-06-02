@@ -47,6 +47,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   healthValue: 1
+  interactKey: 101
+  fullHealthMessage: Health is already full.
+  fullHealthMessageDuration: 1.5
   healthcollectibleSound: {fileID: 0}
 --- !u!212 &7498040133207435727
 SpriteRenderer:
@@ -143,5 +146,5 @@ BoxCollider2D:
     adaptiveTiling: 0
   m_AutoTiling: 0
   serializedVersion: 2
-  m_Size: {x: 1.28, y: 1.28}
+  m_Size: {x: 2.5, y: 2.5}
   m_EdgeRadius: 0

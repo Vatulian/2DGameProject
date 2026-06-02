@@ -2,6 +2,7 @@ using UnityEngine;
 
 public class LevelEndPortal : MonoBehaviour
 {
+    [SerializeField] private bool activeOnStart = true;
     [SerializeField] private KeyCode interactKey = KeyCode.E;
 
     private bool isActive;
@@ -9,14 +10,14 @@ public class LevelEndPortal : MonoBehaviour
 
     private void Awake()
     {
-        // Başta kapalı
-        SetActive(false);
+        SetActive(activeOnStart);
     }
 
     public void SetActive(bool active)
     {
         isActive = active;
-        gameObject.SetActive(active); // görünür + collider aktif
+        playerInside = false;
+        gameObject.SetActive(active);
     }
 
     private void Update()
@@ -26,6 +27,9 @@ public class LevelEndPortal : MonoBehaviour
 
         if (Input.GetKeyDown(interactKey))
         {
+            if (LevelFlow.Instance == null)
+                return;
+
             LevelFlow.Instance.CompleteLevel();
         }
     }
@@ -40,6 +44,11 @@ public class LevelEndPortal : MonoBehaviour
     private void OnTriggerExit2D(Collider2D other)
     {
         if (!other.CompareTag("Player")) return;
+        playerInside = false;
+    }
+
+    private void OnDisable()
+    {
         playerInside = false;
     }
 }

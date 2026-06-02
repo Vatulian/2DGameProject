@@ -35,7 +35,10 @@ public class TutorialUIManager : MonoBehaviour
     [SerializeField] private float fadeOutDuration = 0.15f;
 
     private Coroutine fadeRoutine;
+    private Coroutine temporaryRoutine;
     private int showRequestCount;
+    private bool hasPersistentRequest;
+    private HintRequest currentPersistentRequest;
 
     private void Awake()
     {
@@ -66,10 +69,83 @@ public class TutorialUIManager : MonoBehaviour
     public void ShowPersistent(HintRequest request)
     {
         showRequestCount = Mathf.Max(showRequestCount + 1, 1);
+        currentPersistentRequest = request;
+        hasPersistentRequest = true;
 
         if (panel == null || canvasGroup == null || hintText == null)
             return;
 
+        if (temporaryRoutine == null)
+            RenderRequest(request);
+
+        StartFade(1f, fadeInDuration, false);
+    }
+
+    public void HidePersistent()
+    {
+        showRequestCount = Mathf.Max(showRequestCount - 1, 0);
+
+        if (showRequestCount > 0)
+            return;
+
+        hasPersistentRequest = false;
+
+        if (temporaryRoutine != null)
+            return;
+
+        if (panel == null || canvasGroup == null)
+            return;
+
+        StartFade(0f, fadeOutDuration, true);
+    }
+
+    public void ShowTemporary(string message, float duration = 1.5f)
+    {
+        ShowTemporary(new HintRequest { message = message }, duration);
+    }
+
+    public void ShowTemporary(HintRequest request, float duration = 1.5f)
+    {
+        if (panel == null || canvasGroup == null || hintText == null)
+            return;
+
+        if (temporaryRoutine != null)
+            StopCoroutine(temporaryRoutine);
+
+        temporaryRoutine = StartCoroutine(TemporaryRoutine(request, duration));
+    }
+
+    public void ForceHidden()
+    {
+        showRequestCount = 0;
+        hasPersistentRequest = false;
+
+        if (fadeRoutine != null)
+            StopCoroutine(fadeRoutine);
+
+        if (temporaryRoutine != null)
+        {
+            StopCoroutine(temporaryRoutine);
+            temporaryRoutine = null;
+        }
+
+        if (panel != null)
+            panel.SetActive(false);
+
+        if (canvasGroup != null)
+            canvasGroup.alpha = 0f;
+    }
+
+    private void StartFade(float targetAlpha, float duration, bool disableOnEnd)
+    {
+        if (fadeRoutine != null)
+            StopCoroutine(fadeRoutine);
+
+        fadeRoutine = StartCoroutine(FadeRoutine(targetAlpha, duration, disableOnEnd));
+    }
+
+    private void RenderRequest(HintRequest request)
+    {
         panel.SetActive(true);
         hintText.text = request.message;
 
@@ -89,43 +165,26 @@ public class TutorialUIManager : MonoBehaviour
 
         if (configureLayoutOnAwake)
             ApplyLayout();
+    }
 
+    private IEnumerator TemporaryRoutine(HintRequest request, float duration)
+    {
+        RenderRequest(request);
         StartFade(1f, fadeInDuration, false);
-    }
 
-    public void HidePersistent()
-    {
-        showRequestCount = Mathf.Max(showRequestCount - 1, 0);
+        yield return new WaitForSeconds(Mathf.Max(0f, duration));
 
-        if (showRequestCount > 0)
-            return;
+        temporaryRoutine = null;
 
-        if (panel == null || canvasGroup == null)
-            return;
-
-        StartFade(0f, fadeOutDuration, true);
-    }
-
-    public void ForceHidden()
-    {
-        showRequestCount = 0;
-
-        if (fadeRoutine != null)
-            StopCoroutine(fadeRoutine);
-
-        if (panel != null)
-            panel.SetActive(false);
-
-        if (canvasGroup != null)
-            canvasGroup.alpha = 0f;
-    }
-
-    private void StartFade(float targetAlpha, float duration, bool disableOnEnd)
-    {
-        if (fadeRoutine != null)
-            StopCoroutine(fadeRoutine);
-
-        fadeRoutine = StartCoroutine(FadeRoutine(targetAlpha, duration, disableOnEnd));
+        if (showRequestCount > 0 && hasPersistentRequest)
+        {
+            RenderRequest(currentPersistentRequest);
+            StartFade(1f, fadeInDuration, false);
+        }
+        else
+        {
+            StartFade(0f, fadeOutDuration, true);
+        }
     }
 
     private void ApplyLayout()

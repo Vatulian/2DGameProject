@@ -122,6 +122,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   keyItem: {fileID: 11400000, guid: 4366e98e9d2297942be9e04551110f1b, type: 2}
   amount: 1
+  interactKey: 101
 --- !u!61 &5647248937197034223
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -165,5 +166,5 @@ BoxCollider2D:
     adaptiveTiling: 0
   m_AutoTiling: 0
   serializedVersion: 2
-  m_Size: {x: 0.4, y: 1.28}
+  m_Size: {x: 2, y: 2}
   m_EdgeRadius: 0

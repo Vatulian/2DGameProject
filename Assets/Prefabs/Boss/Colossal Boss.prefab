@@ -138,6 +138,10 @@ MonoBehaviour:
   enablePhaseTwo: 1
   phaseTwoHealthRatio: 0.5
   phaseTwoBuffDuration: 1.4
+  deathDropPrefab: {fileID: 100000, guid: d6e303c3cdb047dcb244d21ea39fc433, type: 3}
+  deathDropSpawnPoint: {fileID: 0}
+  deathDropOffset: {x: 0, y: 0.75}
+  dropOnlyOnce: 1
   wakeStateName: Wake
   idleStateName: Idle
   moveStateName: Move

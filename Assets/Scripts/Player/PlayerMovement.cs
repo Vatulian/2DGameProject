@@ -184,10 +184,11 @@ public class PlayerMovement : MonoBehaviour
         #region INPUT HANDLER
         _moveInput.x = Input.GetAxisRaw("Horizontal");
         _moveInput.y = Input.GetAxisRaw("Vertical");
+        bool dashPressedThisFrame = Input.GetKeyDown(KeyCode.X) || Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.K);
 
-        bool canFlip = !IsWallJumping || Time.time - _wallJumpStartTime > Data.wallJumpInputLockTime;
+        bool canFlip = !IsDashing && (!IsWallJumping || Time.time - _wallJumpStartTime > Data.wallJumpInputLockTime);
 
-        if (_moveInput.x != 0 && canFlip)
+        if (_moveInput.x != 0 && canFlip && !dashPressedThisFrame)
             CheckDirectionToFace(_moveInput.x > 0);
 
         if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.J))
@@ -201,7 +202,7 @@ public class PlayerMovement : MonoBehaviour
             OnJumpUpInput();
         }
 
-        if (Input.GetKeyDown(KeyCode.X) || Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.K))
+        if (dashPressedThisFrame)
         {
             OnDashInput();
         }
@@ -1323,6 +1324,31 @@ public class PlayerMovement : MonoBehaviour
     {
         forcedHorizontalVelocity = 0f;
         forcedHorizontalVelocityTimer = 0f;
+    }
+
+    public void PrepareForLedgeClimb()
+    {
+        LastPressedJumpTime = 0f;
+        _jumpPressedThisFrame = false;
+        IsJumping = false;
+        IsWallJumping = false;
+        IsSliding = false;
+        _isJumpCut = false;
+        _isJumpFalling = false;
+    }
+
+    public void CompleteLedgeClimbLanding()
+    {
+        PrepareForLedgeClimb();
+        LastOnGroundTime = Data != null ? Data.coyoteTime : 0.1f;
+        LastOnWallTime = 0f;
+        LastOnWallRightTime = 0f;
+        LastOnWallLeftTime = 0f;
+        _wallSlideGraceTimer = 0f;
+        _hasGroundContact = true;
+
+        if (Data != null)
+            _extraJumpsLeft = Data.extraJumpCount;
     }
 
     public bool IsGrounded()

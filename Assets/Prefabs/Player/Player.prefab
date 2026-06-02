@@ -594,8 +594,8 @@ MonoBehaviour:
   ledgeLayer:
     serializedVersion: 2
     m_Bits: 256
-  lowerRayHeight: -0.6
-  upperRayHeight: 0.35
+  lowerRayHeight: -0.65
+  upperRayHeight: 0.45
   rayDistance: 0.6
   surfaceProbeTopPadding: 0.25
   surfaceProbeBelowWallHit: 0.15

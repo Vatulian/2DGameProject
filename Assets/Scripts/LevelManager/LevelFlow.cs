@@ -23,17 +23,19 @@ public class LevelFlow : MonoBehaviour
             Destroy(gameObject);
             return;
         }
+
         Instance = this;
+
+        if (endPortal == null)
+            endPortal = FindFirstObjectByType<LevelEndPortal>(FindObjectsInactive.Include);
     }
 
-    // Boss ölünce burayı çağır
     public void ActivateEndPortal()
     {
         if (endPortal != null)
             endPortal.SetActive(true);
     }
 
-    // Portal E ile burayı çağırıyor
     public void CompleteLevel()
     {
         if (completed) return;
@@ -52,14 +54,12 @@ public class LevelFlow : MonoBehaviour
         int currentIndex = SceneManager.GetActiveScene().buildIndex;
         int nextIndex = currentIndex + 1;
 
-        // Build Settings'teki sahne sayısına göre karar ver
         if (nextIndex < SceneManager.sceneCountInBuildSettings)
         {
             SceneManager.LoadScene(nextIndex);
         }
         else
         {
-            // başka level yok → Main Menu
             SceneManager.LoadScene(mainMenuSceneName);
         }
     }

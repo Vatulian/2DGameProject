@@ -14,6 +14,11 @@ public class PlayerRespawn : MonoBehaviour
     private SpriteRenderer spriteRenderer;
     private Animator anim;
     private UIManager uiManager;
+    private PlayerMovement movement;
+    private LedgeClimb ledgeClimb;
+    private Vector3 initialSpawnPosition;
+    private Vector3 hazardRecoveryPosition;
+    private bool hasHazardRecoveryPosition;
 
     private void Awake()
     {
@@ -27,6 +32,9 @@ public class PlayerRespawn : MonoBehaviour
         if (anim == null)
             anim = GetComponentInChildren<Animator>();
         uiManager = FindAnyObjectByType<UIManager>();
+        movement = GetComponent<PlayerMovement>();
+        ledgeClimb = GetComponent<LedgeClimb>();
+        initialSpawnPosition = transform.position;
     }
 
     public void CheckRespawn()
@@ -38,13 +46,7 @@ public class PlayerRespawn : MonoBehaviour
     {
         if (currentCheckpoint != null)
         {
-            transform.position = currentCheckpoint.position;
-            if (rb != null)
-            {
-                rb.position = currentCheckpoint.position;
-                rb.velocity = Vector2.zero;
-                rb.angularVelocity = 0f;
-            }
+            MovePlayerTo(currentCheckpoint.position);
 
             playerHealth.Respawn();
 
@@ -73,12 +75,34 @@ public class PlayerRespawn : MonoBehaviour
         }
     }
 
+    public void SetHazardRecoveryPosition(Vector3 position)
+    {
+        hazardRecoveryPosition = position;
+        hasHazardRecoveryPosition = true;
+    }
+
+    public void RecoverFromHazard(float damage)
+    {
+        if (playerHealth == null || playerHealth.IsDead)
+            return;
+
+        if (damage > 0f)
+        {
+            playerHealth.TakeDamage(damage);
+            if (playerHealth.IsDead)
+                return;
+        }
+
+        MovePlayerTo(GetHazardRecoveryPosition());
+    }
+
     private void OnTriggerEnter2D(Collider2D collision)
     {
         if (!collision.CompareTag("Checkpoint"))
             return;
 
         currentCheckpoint = collision.transform;
+        SetHazardRecoveryPosition(currentCheckpoint.position);
 
         if (playerHealth != null)
             playerHealth.SetCheckpointHealth();
@@ -109,5 +133,32 @@ public class PlayerRespawn : MonoBehaviour
             if (eventSystem != null && eventSystem.isActiveAndEnabled)
                 eventSystem.gameObject.SetActive(false);
         }
+    }
+
+    private Vector3 GetDefaultRecoveryPosition()
+    {
+        return currentCheckpoint != null ? currentCheckpoint.position : initialSpawnPosition;
+    }
+
+    private Vector3 GetHazardRecoveryPosition()
+    {
+        return hasHazardRecoveryPosition ? hazardRecoveryPosition : GetDefaultRecoveryPosition();
+    }
+
+    private void MovePlayerTo(Vector3 position)
+    {
+        ledgeClimb?.CancelClimb(false);
+        movement?.ClearForcedHorizontalVelocity();
+        movement?.ClearAirAttackFloat();
+
+        transform.position = position;
+        if (rb != null)
+        {
+            rb.position = position;
+            rb.velocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+        }
+
+        Physics2D.SyncTransforms();
     }
 }

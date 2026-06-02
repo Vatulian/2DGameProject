@@ -22,6 +22,11 @@ public class LedgeClimb : MonoBehaviour
     [SerializeField] private float surfaceProbeBelowWallHit = 0.15f;
     [SerializeField] private float surfaceProbeInset = 0.35f;
 
+    [Header("Trap Blocking")]
+    [SerializeField] private bool blockClimbOntoTraps = true;
+    [SerializeField] private Vector2 trapBlockCheckSize = new Vector2(0.7f, 0.35f);
+    [SerializeField] private Vector2 trapBlockCheckOffset = new Vector2(0.35f, 0.2f);
+
     [Header("Climb")]
     [SerializeField] private float grabDuration = 0.32f;
     [SerializeField] private float climbDuration = 0.5f;
@@ -52,6 +57,7 @@ public class LedgeClimb : MonoBehaviour
     private Vector2 lastUpperRayEnd;
     private Vector2 lastSurfaceRayStart;
     private Vector2 lastSurfaceRayEnd;
+    private Vector2 lastTrapBlockCheckCenter;
     private Vector2 lastCornerPoint;
 
     public bool IsClimbing { get; private set; }
@@ -187,6 +193,9 @@ public class LedgeClimb : MonoBehaviour
         if (!TryFindSurfacePoint(lowerHit.point, dirSign, out Vector2 surfacePoint))
             return;
 
+        if (IsTrapBlockingClimb(lowerHit.point, surfacePoint, dirSign))
+            return;
+
         StoreLedgeDebug(lowerOrigin, upperOrigin, direction, lowerHit.point, surfacePoint);
         climbRoutine = StartCoroutine(ClimbRoutine(lowerHit.point, surfacePoint, dirSign));
     }
@@ -267,6 +276,29 @@ public class LedgeClimb : MonoBehaviour
         return closestHit;
     }
 
+    private bool IsTrapBlockingClimb(Vector2 wallHitPoint, Vector2 surfacePoint, float dirSign)
+    {
+        if (!blockClimbOntoTraps)
+            return false;
+
+        Vector2 cornerPoint = new Vector2(wallHitPoint.x, surfacePoint.y);
+        Vector2 checkCenter = cornerPoint + new Vector2(trapBlockCheckOffset.x * dirSign, trapBlockCheckOffset.y);
+        lastTrapBlockCheckCenter = checkCenter;
+
+        Collider2D[] hits = Physics2D.OverlapBoxAll(checkCenter, trapBlockCheckSize, 0f);
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider2D hit = hits[i];
+            if (hit == null || hit.transform.IsChildOf(transform))
+                continue;
+
+            if (hit.GetComponentInParent<TrapDamage>() != null)
+                return true;
+        }
+
+        return false;
+    }
+
     private bool IsValidLedgeCollider(Collider2D hit)
     {
         if (hit == null)
@@ -295,6 +327,7 @@ public class LedgeClimb : MonoBehaviour
         IsClimbing = true;
         gravityBeforeClimb = rb.gravityScale;
 
+        playerMovement.PrepareForLedgeClimb();
         playerMovement.ClearForcedHorizontalVelocity();
         playerMovement.ClearAirAttackFloat();
         playerMovement.SetGravityScale(0f);
@@ -319,6 +352,7 @@ public class LedgeClimb : MonoBehaviour
 
         rb.velocity = Vector2.zero;
 
+        playerMovement.CompleteLedgeClimbLanding();
         float defaultGravity = playerMovement.Data != null ? playerMovement.Data.gravityScale : gravityBeforeClimb;
         playerMovement.SetGravityScale(defaultGravity);
 
@@ -463,6 +497,11 @@ public class LedgeClimb : MonoBehaviour
         Vector2 cornerPoint = new Vector2(lowerHit.point.x, surfaceHit.point.y);
         Gizmos.color = Color.white;
         Gizmos.DrawWireSphere(cornerPoint, 0.055f);
+
+        Gizmos.color = new Color(1f, 0.25f, 0.25f, 0.8f);
+        Gizmos.DrawWireCube(
+            cornerPoint + new Vector2(trapBlockCheckOffset.x * dirSign, trapBlockCheckOffset.y),
+            trapBlockCheckSize);
     }
 
     private void DrawStoredLedgeDebug()
@@ -478,6 +517,9 @@ public class LedgeClimb : MonoBehaviour
 
         Gizmos.color = Color.white;
         Gizmos.DrawWireSphere(lastCornerPoint, 0.055f);
+
+        Gizmos.color = new Color(1f, 0.25f, 0.25f, 0.8f);
+        Gizmos.DrawWireCube(lastTrapBlockCheckCenter, trapBlockCheckSize);
     }
 
     private float GetDebugFacingSign()
