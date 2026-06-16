@@ -31,7 +31,7 @@ public class KeyPickup : MonoBehaviour
             return;
         }
 
-        InteractionPromptUI.Show(this);
+        TutorialUIManager.ShowInteractionPrompt(this);
     }
 
     private void OnTriggerExit2D(Collider2D other)
@@ -43,13 +43,13 @@ public class KeyPickup : MonoBehaviour
             return;
 
         playerInventory = null;
-        InteractionPromptUI.Hide(this);
+        TutorialUIManager.HideInteractionPrompt(this);
     }
 
     private void OnDisable()
     {
         playerInventory = null;
-        InteractionPromptUI.Hide(this);
+        TutorialUIManager.HideInteractionPrompt(this);
     }
 
     private void TryCollect()

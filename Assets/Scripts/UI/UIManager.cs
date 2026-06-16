@@ -51,7 +51,9 @@ public class UIManager : MonoBehaviour
         if (!enablePauseInThisScene)
             return;
 
-        if (Input.GetKeyDown(KeyCode.Escape) && pauseScreen != null)
+        if (Input.GetKeyDown(KeyCode.Escape)
+            && pauseScreen != null
+            && !MerchantUI.BlocksPauseInput)
             PauseGame(!pauseScreen.activeInHierarchy);
     }
 

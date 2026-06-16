@@ -58,7 +58,7 @@ MonoBehaviour:
   wallClingTime: 0.15
   slideSpeed: -3
   slideAccel: 8
-  wallSlideReleaseGraceTime: 0.5
+  wallSlideReleaseGraceTime: 2
   coyoteTime: 0.201
   wallCoyoteTime: 0.006
   jumpInputBufferTime: 0.201

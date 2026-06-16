@@ -1,5 +1,6 @@
 using UnityEngine;
 
+[RequireComponent(typeof(PlayerMana))]
 public class PlayerParry : MonoBehaviour
 {
     [Header("Input")]
@@ -18,10 +19,15 @@ public class PlayerParry : MonoBehaviour
     [SerializeField] private AudioClip parryStartSound;
     [SerializeField] private AudioClip parrySuccessSound;
 
+    [Header("Mana Reward")]
+    [SerializeField, Min(0)] private int successfulParryManaReward = 20;
+
     private Animator anim;
     private PlayerAnimationController animationController;
     private PlayerMovement movement;
     private PlayerMeleeAttack meleeAttack;
+    private PlayerSpecialMove specialMove;
+    private PlayerMana playerMana;
     private Health health;
     private float activeTimer;
     private float cooldownTimer;
@@ -65,6 +71,8 @@ public class PlayerParry : MonoBehaviour
         animationController = GetComponentInChildren<PlayerAnimationController>();
         movement = GetComponent<PlayerMovement>();
         meleeAttack = GetComponent<PlayerMeleeAttack>();
+        specialMove = GetComponent<PlayerSpecialMove>();
+        playerMana = GetComponent<PlayerMana>();
         health = GetComponent<Health>();
     }
 
@@ -89,6 +97,9 @@ public class PlayerParry : MonoBehaviour
             return false;
 
         if (movement != null && (movement.IsDashing || movement.IsClimbing))
+            return false;
+
+        if (specialMove != null && specialMove.IsActive)
             return false;
 
         meleeAttack?.TryCancelForParry();
@@ -121,6 +132,9 @@ public class PlayerParry : MonoBehaviour
 
         if (SoundManager.instance && parrySuccessSound)
             SoundManager.instance.PlaySound(parrySuccessSound);
+
+        if (successfulParryManaReward > 0)
+            playerMana?.RestoreMana(successfulParryManaReward);
 
         return true;
     }

@@ -43,6 +43,11 @@ public class CameraController : MonoBehaviour
     [FormerlySerializedAs("zoomLerpSpeed")]
     [SerializeField] private float zoomLerpSpeed = 3f;
 
+    [Header("Pixel Art")]
+    [SerializeField] private bool snapCameraToPixelGrid = true;
+    [SerializeField] private bool snapOrthographicSizeToPixelRatio = true;
+    [SerializeField] private int pixelsPerUnit = 16;
+
     [Header("Lock Settings")]
     [SerializeField] private bool isLocked;
     [SerializeField] private Vector3 lockedPosition;
@@ -64,6 +69,7 @@ public class CameraController : MonoBehaviour
     private float lockedOrthographicSize;
     private Coroutine shakeRoutine;
     private Vector3 shakeOffset;
+    private PixelPerfectCinemachineExtension pixelPerfectExtension;
 
     private void Awake()
     {
@@ -88,6 +94,7 @@ public class CameraController : MonoBehaviour
         zoomLerpSpeed = Mathf.Max(0.01f, zoomLerpSpeed);
         releaseDuration = Mathf.Max(0.01f, releaseDuration);
         normalSize = Mathf.Max(0.1f, normalSize);
+        pixelsPerUnit = Mathf.Max(1, pixelsPerUnit);
         horizontalDamping = Mathf.Max(0f, horizontalDamping);
         verticalDamping = Mathf.Max(0f, verticalDamping);
         deadZoneWidth = Mathf.Clamp01(deadZoneWidth);
@@ -104,6 +111,7 @@ public class CameraController : MonoBehaviour
         }
 
         ApplyCinemachineSettings();
+        ApplyPixelPerfectSettings();
     }
 
     private void LateUpdate()
@@ -216,6 +224,7 @@ public class CameraController : MonoBehaviour
         virtualCamera.Follow = followTarget;
         virtualCamera.LookAt = null;
         virtualCamera.m_Lens.Orthographic = true;
+        ApplyPixelPerfectSettings();
 
         framingTransposer = virtualCamera.GetCinemachineComponent<CinemachineFramingTransposer>();
         if (framingTransposer == null)
@@ -276,6 +285,28 @@ public class CameraController : MonoBehaviour
         framingTransposer.m_UnlimitedSoftZone = false;
         framingTransposer.m_BiasX = 0f;
         framingTransposer.m_BiasY = 0f;
+    }
+
+    private void ApplyPixelPerfectSettings()
+    {
+        if (virtualCamera == null)
+        {
+            return;
+        }
+
+        if (pixelPerfectExtension == null)
+        {
+            pixelPerfectExtension = virtualCamera.GetComponent<PixelPerfectCinemachineExtension>();
+        }
+
+        if (pixelPerfectExtension == null)
+        {
+            pixelPerfectExtension = virtualCamera.gameObject.AddComponent<PixelPerfectCinemachineExtension>();
+        }
+
+        pixelPerfectExtension.SnapToPixelGrid = snapCameraToPixelGrid;
+        pixelPerfectExtension.PixelsPerUnit = pixelsPerUnit;
+        pixelPerfectExtension.enabled = snapCameraToPixelGrid;
     }
 
     private void ResolvePlayerReference()
@@ -388,6 +419,7 @@ public class CameraController : MonoBehaviour
         float smoothTime = 1f / zoomLerpSpeed;
         float nextSize = Mathf.SmoothDamp(virtualCamera.m_Lens.OrthographicSize, targetSize, ref currentZoomVelocity, smoothTime);
 
+        nextSize = GetPixelPerfectOrthographicSize(nextSize);
         virtualCamera.m_Lens.OrthographicSize = nextSize;
         cam.orthographicSize = nextSize;
     }
@@ -398,6 +430,18 @@ public class CameraController : MonoBehaviour
             return normalSize;
 
         return lockedOrthographicSize > 0f ? lockedOrthographicSize : normalSize;
+    }
+
+    private float GetPixelPerfectOrthographicSize(float size)
+    {
+        if (!snapOrthographicSizeToPixelRatio || pixelsPerUnit <= 0 || !Application.isPlaying || Screen.height <= 0)
+        {
+            return size;
+        }
+
+        float assetPixelsPerScreenPixel = Screen.height / (2f * size * pixelsPerUnit);
+        int pixelRatio = Mathf.Max(1, Mathf.RoundToInt(assetPixelsPerScreenPixel));
+        return Screen.height / (2f * pixelsPerUnit * pixelRatio);
     }
 
     private void UpdateScreenComposition()

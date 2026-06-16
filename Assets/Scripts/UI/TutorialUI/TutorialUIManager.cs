@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -34,11 +35,21 @@ public class TutorialUIManager : MonoBehaviour
     [SerializeField] private float fadeInDuration = 0.15f;
     [SerializeField] private float fadeOutDuration = 0.15f;
 
+    [Header("Interaction Prompt")]
+    [SerializeField] private CanvasGroup interactionPromptGroup;
+    [SerializeField] private TextMeshProUGUI interactionPromptText;
+    [SerializeField] private string interactionPromptMessage = "Press E";
+    [SerializeField] private Vector2 interactionPromptSize = new Vector2(210f, 54f);
+    [SerializeField] private Vector2 interactionPromptPosition = new Vector2(0f, 120f);
+    [SerializeField] private float interactionPromptFontSize = 30f;
+    [SerializeField, Range(0f, 1f)] private float interactionPromptBackgroundAlpha = 0.55f;
+
     private Coroutine fadeRoutine;
     private Coroutine temporaryRoutine;
     private int showRequestCount;
     private bool hasPersistentRequest;
     private HintRequest currentPersistentRequest;
+    private readonly HashSet<MonoBehaviour> interactionPromptRequesters = new HashSet<MonoBehaviour>();
 
     private void Awake()
     {
@@ -56,6 +67,8 @@ public class TutorialUIManager : MonoBehaviour
             if (canvasGroup == null)
                 canvasGroup = panel.AddComponent<CanvasGroup>();
         }
+
+        EnsureInteractionPrompt();
 
         if (configureLayoutOnAwake)
             ApplyLayout();
@@ -109,16 +122,40 @@ public class TutorialUIManager : MonoBehaviour
         if (panel == null || canvasGroup == null || hintText == null)
             return;
 
+        if (!isActiveAndEnabled)
+            return;
+
         if (temporaryRoutine != null)
             StopCoroutine(temporaryRoutine);
 
         temporaryRoutine = StartCoroutine(TemporaryRoutine(request, duration));
     }
 
+    public static void ShowInteractionPrompt(MonoBehaviour requester)
+    {
+        if (Instance == null || requester == null)
+            return;
+
+        Instance.interactionPromptRequesters.Add(requester);
+        Instance.UpdateInteractionPromptVisibility();
+    }
+
+    public static void HideInteractionPrompt(MonoBehaviour requester)
+    {
+        if (Instance == null)
+            return;
+
+        if (requester != null)
+            Instance.interactionPromptRequesters.Remove(requester);
+
+        Instance.UpdateInteractionPromptVisibility();
+    }
+
     public void ForceHidden()
     {
         showRequestCount = 0;
         hasPersistentRequest = false;
+        interactionPromptRequesters.Clear();
 
         if (fadeRoutine != null)
             StopCoroutine(fadeRoutine);
@@ -134,14 +171,34 @@ public class TutorialUIManager : MonoBehaviour
 
         if (canvasGroup != null)
             canvasGroup.alpha = 0f;
+
+        SetInteractionPromptVisible(false);
     }
 
     private void StartFade(float targetAlpha, float duration, bool disableOnEnd)
     {
         if (fadeRoutine != null)
+        {
             StopCoroutine(fadeRoutine);
+            fadeRoutine = null;
+        }
+
+        if (!isActiveAndEnabled)
+        {
+            ApplyFadeState(targetAlpha, disableOnEnd);
+            return;
+        }
 
         fadeRoutine = StartCoroutine(FadeRoutine(targetAlpha, duration, disableOnEnd));
+    }
+
+    private void ApplyFadeState(float targetAlpha, bool disableOnEnd)
+    {
+        if (canvasGroup != null)
+            canvasGroup.alpha = targetAlpha;
+
+        if (panel != null)
+            panel.SetActive(!(targetAlpha <= 0f && disableOnEnd));
     }
 
     private void RenderRequest(HintRequest request)
@@ -165,6 +222,68 @@ public class TutorialUIManager : MonoBehaviour
 
         if (configureLayoutOnAwake)
             ApplyLayout();
+    }
+
+    private void EnsureInteractionPrompt()
+    {
+        if (interactionPromptGroup != null && interactionPromptText != null)
+        {
+            interactionPromptText.text = interactionPromptMessage;
+            SetInteractionPromptVisible(false);
+            return;
+        }
+
+        Transform promptParent = panel != null && panel.transform.parent != null ? panel.transform.parent : transform;
+        GameObject promptObject = new GameObject("InteractionPrompt", typeof(RectTransform), typeof(CanvasRenderer), typeof(Image), typeof(CanvasGroup));
+        promptObject.transform.SetParent(promptParent, false);
+
+        RectTransform promptRect = promptObject.GetComponent<RectTransform>();
+        promptRect.anchorMin = new Vector2(0.5f, 0f);
+        promptRect.anchorMax = new Vector2(0.5f, 0f);
+        promptRect.pivot = new Vector2(0.5f, 0.5f);
+        promptRect.anchoredPosition = interactionPromptPosition;
+        promptRect.sizeDelta = interactionPromptSize;
+
+        Image background = promptObject.GetComponent<Image>();
+        background.color = new Color(0f, 0f, 0f, interactionPromptBackgroundAlpha);
+        background.raycastTarget = false;
+
+        interactionPromptGroup = promptObject.GetComponent<CanvasGroup>();
+        interactionPromptGroup.interactable = false;
+        interactionPromptGroup.blocksRaycasts = false;
+
+        GameObject textObject = new GameObject("Text", typeof(RectTransform), typeof(CanvasRenderer), typeof(TextMeshProUGUI));
+        textObject.transform.SetParent(promptObject.transform, false);
+
+        RectTransform textRect = textObject.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+
+        interactionPromptText = textObject.GetComponent<TextMeshProUGUI>();
+        interactionPromptText.text = interactionPromptMessage;
+        interactionPromptText.alignment = TextAlignmentOptions.Center;
+        interactionPromptText.fontSize = interactionPromptFontSize;
+        interactionPromptText.fontStyle = FontStyles.Bold;
+        interactionPromptText.color = new Color(1f, 1f, 1f, 0.92f);
+        interactionPromptText.raycastTarget = false;
+
+        SetInteractionPromptVisible(false);
+    }
+
+    private void UpdateInteractionPromptVisibility()
+    {
+        interactionPromptRequesters.RemoveWhere(requester => requester == null || !requester.isActiveAndEnabled);
+        SetInteractionPromptVisible(interactionPromptRequesters.Count > 0);
+    }
+
+    private void SetInteractionPromptVisible(bool visible)
+    {
+        if (interactionPromptGroup == null)
+            return;
+
+        interactionPromptGroup.alpha = visible ? 1f : 0f;
     }
 
     private IEnumerator TemporaryRoutine(HintRequest request, float duration)

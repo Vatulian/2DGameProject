@@ -1,5 +1,6 @@
 using UnityEngine;
 
+[RequireComponent(typeof(PlayerMana))]
 public class PlayerAttack : MonoBehaviour
 {
     [SerializeField] private float attackCooldown = 0.25f;
@@ -9,10 +10,15 @@ public class PlayerAttack : MonoBehaviour
     [SerializeField] private AudioClip fireballSound;
     [SerializeField] private KeyCode attackKey = KeyCode.F;
 
+    [Header("Mana")]
+    [SerializeField, Min(0)] private int manaCost = 20;
+
     private PlayerAnimationController animationController;
     private Animator anim;
     private PlayerMovement playerMovement;
     private PlayerMeleeAttack meleeAttack;
+    private PlayerSpecialMove specialMove;
+    private PlayerMana playerMana;
     private Health health;
     private float cooldownTimer = 0f;
     private float attackLockTimer = 0f;
@@ -28,6 +34,8 @@ public class PlayerAttack : MonoBehaviour
             anim = GetComponentInChildren<Animator>();
         playerMovement = GetComponent<PlayerMovement>();
         meleeAttack = GetComponent<PlayerMeleeAttack>();
+        specialMove = GetComponent<PlayerSpecialMove>();
+        playerMana = GetComponent<PlayerMana>();
         health = GetComponent<Health>();
         EnsureFireballsAssigned();
     }
@@ -44,7 +52,8 @@ public class PlayerAttack : MonoBehaviour
             && cooldownTimer <= 0f
             && playerMovement != null
             && playerMovement.canAttack()
-            && (meleeAttack == null || !meleeAttack.IsAttacking))
+            && (meleeAttack == null || !meleeAttack.IsAttacking)
+            && (specialMove == null || !specialMove.IsActive))
         {
             FireOnce();
         }
@@ -59,6 +68,15 @@ public class PlayerAttack : MonoBehaviour
         if (idx < 0)
             return;
 
+        GameObject fireball = fireballs[idx];
+        Projectile projectile = fireball.GetComponent<Projectile>();
+        if (projectile == null)
+            return;
+
+        int effectiveManaCost = playerMana != null ? playerMana.GetModifiedManaCost(manaCost) : manaCost;
+        if (effectiveManaCost > 0 && (playerMana == null || !playerMana.TrySpendMana(effectiveManaCost)))
+            return;
+
         cooldownTimer = attackCooldown;
         attackLockTimer = Mathf.Max(attackLockDuration, attackCooldown * 0.5f);
         playerMovement?.LockHorizontalMovement(attackLockTimer);
@@ -69,15 +87,9 @@ public class PlayerAttack : MonoBehaviour
         if (SoundManager.instance && fireballSound)
             SoundManager.instance.PlaySound(fireballSound);
 
-        GameObject go = fireballs[idx];
         float dir = GetFacingDirection();
-        go.transform.position = GetFirePointPosition(dir);
-
-        Projectile proj = go.GetComponent<Projectile>();
-        if (proj != null)
-            proj.Fire(transform, dir);
-        else
-            go.GetComponent<Projectile>()?.SetDirection(dir);
+        fireball.transform.position = GetFirePointPosition(dir);
+        projectile.Fire(transform, dir);
     }
 
     private float GetFacingDirection()

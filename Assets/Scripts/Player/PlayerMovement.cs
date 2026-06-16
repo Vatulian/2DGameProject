@@ -104,6 +104,7 @@ public class PlayerMovement : MonoBehaviour
     private float forcedHorizontalVelocityTimer;
     private float airAttackFloatTimer;
     private float airAttackRestartGraceTimer;
+    private PlayerSpecialMove specialMove;
     private Health health;
     private Collider2D[] playerColliders;
     private Coroutine dropThroughCoroutine;
@@ -118,17 +119,12 @@ public class PlayerMovement : MonoBehaviour
     #endregion
 
     public bool IsLedgeGrabBlocked => oneWayJumpLedgeBlockTimer > 0f;
-    public bool ShouldShowWallSlideAnimation => LastOnGroundTime <= 0f
-        && !IsDashing
-        && !IsWallJumping
-        && HasCurrentWallContact()
-        && !IsPressingAwayFromWall();
-
     private void Awake()
     {
         RB = GetComponent<Rigidbody2D>();
         //AnimHandler = GetComponent<PlayerAnimator>();
         animationController = GetComponentInChildren<PlayerAnimationController>();
+        specialMove = GetComponent<PlayerSpecialMove>();
         health = GetComponent<Health>();
         playerColliders = GetComponentsInChildren<Collider2D>();
         ledgeClimb = GetComponent<LedgeClimb>();
@@ -184,20 +180,26 @@ public class PlayerMovement : MonoBehaviour
         #region INPUT HANDLER
         _moveInput.x = Input.GetAxisRaw("Horizontal");
         _moveInput.y = Input.GetAxisRaw("Vertical");
-        bool dashPressedThisFrame = Input.GetKeyDown(KeyCode.X) || Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.K);
+        bool specialMoveLocked = specialMove != null && specialMove.IsActive;
+        bool dashPressedThisFrame = !specialMoveLocked
+                                    && (Input.GetKeyDown(KeyCode.X)
+                                        || Input.GetKeyDown(KeyCode.LeftShift)
+                                        || Input.GetKeyDown(KeyCode.K));
 
         bool canFlip = !IsDashing && (!IsWallJumping || Time.time - _wallJumpStartTime > Data.wallJumpInputLockTime);
 
         if (_moveInput.x != 0 && canFlip && !dashPressedThisFrame)
             CheckDirectionToFace(_moveInput.x > 0);
 
-        if (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.J))
+        if (!specialMoveLocked
+            && (Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.C) || Input.GetKeyDown(KeyCode.J)))
         {
             if (!TryDropThroughPlatform())
                 OnJumpInput();
         }
 
-        if (Input.GetKeyUp(KeyCode.Space) || Input.GetKeyUp(KeyCode.C) || Input.GetKeyUp(KeyCode.J))
+        if (!specialMoveLocked
+            && (Input.GetKeyUp(KeyCode.Space) || Input.GetKeyUp(KeyCode.C) || Input.GetKeyUp(KeyCode.J)))
         {
             OnJumpUpInput();
         }
@@ -429,7 +431,15 @@ public class PlayerMovement : MonoBehaviour
 
         if (forcedHorizontalVelocityTimer > 0f)
         {
-            RB.velocity = new Vector2(forcedHorizontalVelocity, RB.velocity.y);
+            if (IsForcedHorizontalVelocityPushingIntoWall())
+            {
+                ClearForcedHorizontalVelocity();
+                RB.velocity = new Vector2(GetMovingPlatformVelocity().x, RB.velocity.y);
+            }
+            else
+            {
+                RB.velocity = new Vector2(forcedHorizontalVelocity, RB.velocity.y);
+            }
         }
         else if (horizontalMovementLocked)
         {
@@ -1294,6 +1304,16 @@ public class PlayerMovement : MonoBehaviour
     {
         forcedHorizontalVelocity = velocity;
         forcedHorizontalVelocityTimer = Mathf.Max(0f, duration);
+    }
+
+    private bool IsForcedHorizontalVelocityPushingIntoWall()
+    {
+        if (Mathf.Abs(forcedHorizontalVelocity) <= 0.01f)
+            return false;
+
+        return forcedHorizontalVelocity > 0f
+            ? _isTouchingWallRight
+            : _isTouchingWallLeft;
     }
 
     public void ApplyKnockbackFrom(Vector3 sourcePosition, float horizontalSpeed, float duration, float upwardVelocity)

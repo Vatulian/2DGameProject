@@ -51,6 +51,7 @@ public class PlayerMeleeAttack : MonoBehaviour
     private PlayerAnimationController animationController;
     private PlayerMovement playerMovement;
     private PlayerAttack playerAttack;
+    private PlayerSpecialMove specialMove;
     private Health health;
 
     private int currentPhaseIndex = -1;
@@ -67,6 +68,7 @@ public class PlayerMeleeAttack : MonoBehaviour
         animationController = GetComponentInChildren<PlayerAnimationController>();
         playerMovement = GetComponent<PlayerMovement>();
         playerAttack = GetComponent<PlayerAttack>();
+        specialMove = GetComponent<PlayerSpecialMove>();
         health = GetComponent<Health>();
 
         if (!meleeHitbox)
@@ -141,7 +143,8 @@ public class PlayerMeleeAttack : MonoBehaviour
         {
             if (playerMovement == null
                 || !playerMovement.canAttack()
-                || (playerAttack != null && playerAttack.IsAttacking))
+                || (playerAttack != null && playerAttack.IsAttacking)
+                || (specialMove != null && specialMove.IsActive))
             {
                 return;
             }

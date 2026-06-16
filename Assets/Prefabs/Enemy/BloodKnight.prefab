@@ -170,6 +170,7 @@ GameObject:
   - component: {fileID: 3486712907266971868}
   - component: {fileID: 8989325380587184408}
   - component: {fileID: 5391727816620822111}
+  - component: {fileID: 3860586462445406834}
   m_Layer: 11
   m_Name: Root
   m_TagString: Enemy
@@ -352,6 +353,8 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+  attackDashWallSkin: 0.03
+  attackDashWallProbeInset: 0.08
   idleStateName: idle
   runStateName: run
   attackStateName: double slash
@@ -410,6 +413,29 @@ MonoBehaviour:
   disableBodyColliderOnDeath: 1
   useDeathAnimationEvent: 1
   fallbackDeactivateDelay: 2
+--- !u!114 &3860586462445406834
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1140254548237714823}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 51b413e8ff7c4f6daf0a30fe790d65e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  health: {fileID: 3486712907266971868}
+  essencePickupPrefab: {fileID: 513927829, guid: 7cbb5dcf21d84b9397929f4ecee51f08, type: 3}
+  spawnPoint: {fileID: 0}
+  minDrops: 2
+  maxDrops: 10
+  essencePerPickup: 1
+  dropOnlyOnce: 1
+  spawnOffset: {x: 0, y: 0.35}
+  horizontalScatterSpeed: 2.8
+  upwardScatterSpeed: 4.2
+  randomScatterVariance: 0.8
 --- !u!1 &1613743735128339200
 GameObject:
   m_ObjectHideFlags: 0

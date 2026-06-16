@@ -34,7 +34,7 @@ public class HealthCollectible : MonoBehaviour
         if (playerHealth == null)
             return;
 
-        InteractionPromptUI.Show(this);
+        TutorialUIManager.ShowInteractionPrompt(this);
     }
 
     private void OnTriggerExit2D(Collider2D collision)
@@ -46,13 +46,13 @@ public class HealthCollectible : MonoBehaviour
             return;
 
         playerHealth = null;
-        InteractionPromptUI.Hide(this);
+        TutorialUIManager.HideInteractionPrompt(this);
     }
 
     private void OnDisable()
     {
         playerHealth = null;
-        InteractionPromptUI.Hide(this);
+        TutorialUIManager.HideInteractionPrompt(this);
     }
 
     private void TryCollect()

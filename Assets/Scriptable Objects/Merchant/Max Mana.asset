@@ -1,0 +1,22 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a7b44510bc142879273f509f8d44123, type: 3}
+  m_Name: Max Mana
+  m_EditorClassIdentifier: 
+  displayName: MAX MANA
+  description: Increase maximum mana.
+  icon: {fileID: 4333484838766804168, guid: 34501daa309fe3c4db306bfc79f3c649, type: 3}
+  basePrice: 50
+  priceIncreasePerPurchase: 0
+  maximumPurchases: 1
+  upgradeType: 1
+  amount: 20

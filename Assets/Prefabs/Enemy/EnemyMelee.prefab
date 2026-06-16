@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 303949051904217016}
   - component: {fileID: 7597095289571006283}
   - component: {fileID: 1288334622935180424}
+  - component: {fileID: 811900001000000001}
   m_Layer: 11
   m_Name: EnemyMelee
   m_TagString: Enemy
@@ -171,6 +172,29 @@ MonoBehaviour:
   numberOfFlashes: 0
   components:
   - {fileID: 1288334622935180424}
+--- !u!114 &811900001000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1080698711305869521}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 51b413e8ff7c4f6daf0a30fe790d65e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  health: {fileID: 7597095289571006283}
+  essencePickupPrefab: {fileID: 513927829, guid: 7cbb5dcf21d84b9397929f4ecee51f08, type: 3}
+  spawnPoint: {fileID: 0}
+  minDrops: 2
+  maxDrops: 10
+  essencePerPickup: 1
+  dropOnlyOnce: 1
+  spawnOffset: {x: 0, y: 0.35}
+  horizontalScatterSpeed: 2.8
+  upwardScatterSpeed: 4.2
+  randomScatterVariance: 0.8
 --- !u!114 &1288334622935180424
 MonoBehaviour:
   m_ObjectHideFlags: 0

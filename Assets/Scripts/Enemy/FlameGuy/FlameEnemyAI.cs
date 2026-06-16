@@ -524,7 +524,8 @@ public class FlameEnemyAI : MonoBehaviour, IParryReceiver
             return false;
 
         Vector2 origin = detectionOrigin != null ? detectionOrigin.position : transform.position;
-        Vector2 toPlayer = (Vector2)player.position - origin;
+        Vector2 target = GetPlayerDetectionPoint();
+        Vector2 toPlayer = target - origin;
         float dist = toPlayer.magnitude;
         if (dist <= Mathf.Epsilon || dist > distance)
             return false;
@@ -570,7 +571,7 @@ public class FlameEnemyAI : MonoBehaviour, IParryReceiver
             return true;
 
         Vector2 origin = detectionOrigin != null ? detectionOrigin.position : transform.position;
-        Vector2 target = player.position;
+        Vector2 target = GetPlayerDetectionPoint();
         Vector2 toPlayer = target - origin;
         float distance = toPlayer.magnitude;
 
@@ -593,7 +594,34 @@ public class FlameEnemyAI : MonoBehaviour, IParryReceiver
 
         int mask = obstructionLayers | playerLayer;
         RaycastHit2D hit = Physics2D.Raycast(origin, direction, distance, mask);
-        return hit.collider == null || hit.collider.CompareTag("Player");
+        return hit.collider == null || IsPlayerCollider(hit.collider);
+    }
+
+    private Vector2 GetPlayerDetectionPoint()
+    {
+        if (playerHealth != null)
+        {
+            Collider2D playerCollider = playerHealth.GetComponent<Collider2D>();
+            if (playerCollider != null)
+                return playerCollider.bounds.center;
+        }
+
+        return player != null ? (Vector2)player.position : (Vector2)transform.position;
+    }
+
+    private bool IsPlayerCollider(Collider2D hit)
+    {
+        if (hit == null)
+            return false;
+
+        if (hit.CompareTag("Player"))
+            return true;
+
+        if (player != null && hit.transform.IsChildOf(player))
+            return true;
+
+        Health hitHealth = hit.GetComponent<Health>() ?? hit.GetComponentInParent<Health>();
+        return hitHealth != null && hitHealth == playerHealth;
     }
 
     private void ApplyFacing()
@@ -767,20 +795,48 @@ public class FlameEnemyAI : MonoBehaviour, IParryReceiver
 
     private bool TryResolvePlayer()
     {
-        if (!PlayerReference.IsAvailable)
+        if (PlayerReference.IsAvailable)
         {
-            player = null;
-            playerHealth = null;
-            return false;
+            if (player != PlayerReference.Player)
+            {
+                player = PlayerReference.Player;
+                playerHealth = PlayerReference.Health;
+            }
+
+            return player != null && playerHealth != null;
         }
 
-        if (player != PlayerReference.Player)
+        Health resolvedHealth = null;
+        GameObject playerObject = GameObject.FindGameObjectWithTag("Player");
+        if (playerObject != null)
         {
-            player = PlayerReference.Player;
-            playerHealth = PlayerReference.Health;
+            resolvedHealth = playerObject.GetComponent<Health>();
+            if (resolvedHealth != null && !resolvedHealth.IsDead)
+            {
+                player = playerObject.transform;
+                playerHealth = resolvedHealth;
+                return true;
+            }
         }
 
-        return player != null && playerHealth != null;
+        PlayerMovement playerMovement = FindAnyObjectByType<PlayerMovement>();
+        if (playerMovement != null)
+        {
+            resolvedHealth = playerMovement.GetComponent<Health>() ?? playerMovement.GetComponentInParent<Health>();
+            if (resolvedHealth != null && !resolvedHealth.IsDead)
+            {
+                player = playerMovement.transform;
+                playerHealth = resolvedHealth;
+                return true;
+            }
+        }
+
+        if (player != null && playerHealth != null && !playerHealth.IsDead)
+            return true;
+
+        player = null;
+        playerHealth = null;
+        return false;
     }
 
     private void Move(int direction, float speed)

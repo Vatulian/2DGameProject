@@ -80,7 +80,7 @@ public class PlayerData : ScriptableObject
     [Header("Slide")]
     public float slideSpeed; //Use a negative value for downward wall slide, e.g. -3
     public float slideAccel;
-    [Range(0f, 0.5f)] public float wallSlideReleaseGraceTime = 0.12f; //Keeps wall slide/jump/dash available briefly after letting go of the wall input
+    [Range(0f, 20f)] public float wallSlideReleaseGraceTime = 0.12f; //Keeps wall slide/jump/dash available briefly after letting go of the wall input
 
     [Header("Assists")]
     [Range(0.01f, 0.5f)] public float coyoteTime; //Grace period after falling off a platform, where you can still jump

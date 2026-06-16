@@ -342,6 +342,7 @@ MonoBehaviour:
   rb: {fileID: 0}
   movement: {fileID: 2857215172499364451}
   meleeAttack: {fileID: 5004280239039847823}
+  specialMove: {fileID: 811900001000000006}
   health: {fileID: 4605543683291720943}
   idleStateName: Swordmaster_Idle
   runStateName: Swordmaster_Run
@@ -384,6 +385,9 @@ GameObject:
   - component: {fileID: 5004280239039847823}
   - component: {fileID: 1200995142258743211}
   - component: {fileID: 6622026058386142191}
+  - component: {fileID: 811900001000000004}
+  - component: {fileID: 811900001000000005}
+  - component: {fileID: 811900001000000006}
   m_Layer: 10
   m_Name: Player
   m_TagString: Player
@@ -410,6 +414,77 @@ Transform:
   - {fileID: 7417209060346152800}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &811900001000000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8068614522105042617}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dce3c671cf984850b0fe2c4b6c7fd0aa, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  startingEssence: 0
+  clampToMaximum: 0
+  maximumEssence: 9999
+--- !u!114 &811900001000000005
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8068614522105042617}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71d4b9a6f24842eeab7c5c43c2b24e16, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  maximumMana: 100
+  startingMana: 100
+  regenerationAmount: 1
+  regenerationInterval: 0.2
+  regenerationDelayAfterSpend: 1
+--- !u!114 &811900001000000006
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8068614522105042617}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 92be8ddf02a04c178ea77eb4b18994ef, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  specialMoveKey: 324
+  manaCost: 30
+  cooldown: 1.5
+  castDuration: 0.62
+  swordRepeatDelay: 0.18
+  slamStateName: Slam with no FX
+  animationTransitionDuration: 0.02
+  fxPrefab: {fileID: 100000, guid: d6f23a7e48b1469b8f3d6c7a2e91b504, type: 3}
+  sliceStateName: Dark Slice from Up
+  swordStateName: Dark Swords
+  sliceFxDuration: 0.52
+  swordFxDuration: 1.02
+  sliceOffset: {x: 0.9, y: -0.25}
+  firstSwordDistance: 3
+  secondSwordDistance: 7.8
+  swordVerticalOffset: -0.15
+  sliceDamage: 2
+  sliceHitboxSize: {x: 3, y: 2.2}
+  swordDamage: 2
+  swordPixelSize: {x: 85, y: 44}
+  swordHitboxExtraHeight: 0.3
+  enemyLayers:
+    serializedVersion: 2
+    m_Bits: 2048
+  knockbackDistance: 1.05
+  knockbackUpwardDistance: 0.12
+  knockbackDuration: 0.16
 --- !u!61 &4250974077178668188
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -538,6 +613,7 @@ MonoBehaviour:
   - {fileID: 0}
   fireballSound: {fileID: 8300000, guid: b8cd7dcc9c2cb6c49b660176e80b8759, type: 3}
   attackKey: 102
+  manaCost: 20
 --- !u!114 &4605543683291720943
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -594,12 +670,17 @@ MonoBehaviour:
   ledgeLayer:
     serializedVersion: 2
     m_Bits: 256
+  climbBlockLayer:
+    serializedVersion: 2
+    m_Bits: 768
   lowerRayHeight: -0.65
   upperRayHeight: 0.45
   rayDistance: 0.6
   surfaceProbeTopPadding: 0.25
   surfaceProbeBelowWallHit: 0.15
-  surfaceProbeInset: 0.44
+  surfaceProbeInset: 0.18
+  minimumSurfaceProbeHitDistance: 0.01
+  minimumSurfaceHeightAboveWallHit: 0.18
   grabDuration: 0.32
   climbDuration: 0.5
   climbAnimationSpeed: 1.6
@@ -607,6 +688,7 @@ MonoBehaviour:
   climbCornerAnchorOffset: {x: 0.1, y: -0.5}
   horizontalClearance: 0.08
   verticalClearance: 0.02
+  landingClearanceSkin: 0.02
   maxUpwardSpeedForGrab: 1
   allowWhileSliding: 1
   grabStateName: Swordmaster_LedgeClimb_Ledge_Grab
@@ -729,6 +811,7 @@ MonoBehaviour:
   successAnimationLockTime: 0.45
   parryStartSound: {fileID: 0}
   parrySuccessSound: {fileID: 8300000, guid: 2bf2c1d1949384743b644ba5db8ad666, type: 3}
+  successfulParryManaReward: 20
 --- !u!1 &8853005155900271401
 GameObject:
   m_ObjectHideFlags: 0

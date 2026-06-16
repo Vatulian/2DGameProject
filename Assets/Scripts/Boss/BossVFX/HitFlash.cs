@@ -3,6 +3,10 @@ using UnityEngine;
 
 public class HitFlash : MonoBehaviour
 {
+    [Header("References")]
+    [SerializeField] private Health health;
+    [SerializeField] private bool playOnDamage = true;
+
     [Header("Flash")]
     [SerializeField] private Color flashColor = Color.white;  // genelde beyaz
     [SerializeField] private float flashDuration = 0.12f;     // ilk testte biraz uzun tut
@@ -22,8 +26,11 @@ public class HitFlash : MonoBehaviour
     private MaterialPropertyBlock mpb;
     private Coroutine flashRoutine;
 
-    void Awake()
+    private void Awake()
     {
+        if (health == null)
+            health = GetComponent<Health>() ?? GetComponentInParent<Health>();
+
         sprites = GetComponentsInChildren<SpriteRenderer>(includeInactive: true);
         originalColors = new Color[sprites.Length];
         for (int i = 0; i < sprites.Length; i++)
@@ -33,6 +40,18 @@ public class HitFlash : MonoBehaviour
 
         if (logDebug)
             Debug.Log($"[HitFlash] Found {sprites.Length} SpriteRenderer(s) on {name}");
+    }
+
+    private void OnEnable()
+    {
+        if (playOnDamage && health != null)
+            health.OnDamaged += HandleDamaged;
+    }
+
+    private void OnDisable()
+    {
+        if (health != null)
+            health.OnDamaged -= HandleDamaged;
     }
 
     public void Play()
@@ -80,5 +99,10 @@ public class HitFlash : MonoBehaviour
         }
 
         flashRoutine = null;
+    }
+
+    private void HandleDamaged(float _)
+    {
+        Play();
     }
 }

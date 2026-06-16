@@ -43,6 +43,7 @@ public class Health : MonoBehaviour
     private int originalLayer;
 
     public event Action<float> OnDamaged;
+    public event Action<float, float> OnHealthChanged;
     public event Action OnDeath;
     public event Action OnRespawned;
 
@@ -92,6 +93,7 @@ public class Health : MonoBehaviour
         LastDamagePoint = hitWorldPosition ?? knockbackSource ?? transform.position;
         currentHealth = Mathf.Clamp(currentHealth - _damage, 0, startingHealth);
         OnDamaged?.Invoke(currentHealth);
+        OnHealthChanged?.Invoke(currentHealth, startingHealth);
 
         if (currentHealth > 0)
         {
@@ -168,7 +170,25 @@ public class Health : MonoBehaviour
 
     public void AddHealth(float _value)
     {
+        float previousHealth = currentHealth;
         currentHealth = Mathf.Clamp(currentHealth + _value, 0, startingHealth);
+
+        if (!Mathf.Approximately(previousHealth, currentHealth))
+            OnHealthChanged?.Invoke(currentHealth, startingHealth);
+    }
+
+    public void IncreaseMaximumHealth(float amount, bool healAddedAmount = true)
+    {
+        if (amount <= 0f)
+            return;
+
+        startingHealth += amount;
+
+        if (healAddedAmount)
+            currentHealth = Mathf.Min(currentHealth + amount, startingHealth);
+
+        checkpointHealth = Mathf.Min(checkpointHealth + amount, startingHealth);
+        OnHealthChanged?.Invoke(currentHealth, startingHealth);
     }
 
     private IEnumerator Invunerability()
@@ -205,6 +225,7 @@ public class Health : MonoBehaviour
         dead = false;
         invulnerable = false;
         currentHealth = checkpointHealth;
+        OnHealthChanged?.Invoke(currentHealth, startingHealth);
         if (isPlayerCharacter)
         {
             gameObject.tag = originalTag;
@@ -245,6 +266,7 @@ public class Health : MonoBehaviour
         dead = false;
         invulnerable = false;
         currentHealth = startingHealth;
+        OnHealthChanged?.Invoke(currentHealth, startingHealth);
 
         if (isPlayerCharacter)
         {

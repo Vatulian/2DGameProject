@@ -62,6 +62,8 @@ public class BloodKnightAI : MonoBehaviour, IParryReceiver
     [SerializeField] private float attackDashDistance = 0.75f;
     [SerializeField] private float attackDashDuration = 0.16f;
     [SerializeField] private AnimationCurve attackDashCurve = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+    [SerializeField] private float attackDashWallSkin = 0.03f;
+    [SerializeField] private float attackDashWallProbeInset = 0.08f;
 
     [Header("Animation States")]
     [SerializeField] private string idleStateName = "idle";
@@ -91,6 +93,8 @@ public class BloodKnightAI : MonoBehaviour, IParryReceiver
         chaseLeashExtra = Mathf.Max(0f, chaseLeashExtra);
         groundCheckForwardOffset = Mathf.Max(0f, groundCheckForwardOffset);
         groundCheckDownDistance = Mathf.Max(0.05f, groundCheckDownDistance);
+        attackDashWallSkin = Mathf.Max(0f, attackDashWallSkin);
+        attackDashWallProbeInset = Mathf.Max(0f, attackDashWallProbeInset);
     }
 
     private void Awake()
@@ -623,6 +627,7 @@ public class BloodKnightAI : MonoBehaviour, IParryReceiver
         Vector3 start = transform.position;
         Vector3 target = start + Vector3.right * facing * distance;
         target = ClampPositionToPatrolBounds(target);
+        target = ClampAttackDashTargetBeforeWall(start, target);
 
         float elapsed = 0f;
         while (elapsed < duration)
@@ -636,6 +641,87 @@ public class BloodKnightAI : MonoBehaviour, IParryReceiver
 
         transform.position = target;
         attackDashRoutine = null;
+    }
+
+    private Vector3 ClampAttackDashTargetBeforeWall(Vector3 start, Vector3 target)
+    {
+        if (bodyCollider == null)
+            return target;
+
+        float deltaX = target.x - start.x;
+        if (Mathf.Abs(deltaX) <= 0.001f)
+            return target;
+
+        float direction = Mathf.Sign(deltaX);
+        float travelDistance = Mathf.Abs(deltaX);
+        int wallMask = groundLayers | obstructionLayers;
+        if (wallMask == 0)
+            return target;
+
+        Bounds bounds = bodyCollider.bounds;
+        float frontOffset = direction > 0f
+            ? bounds.max.x - transform.position.x
+            : transform.position.x - bounds.min.x;
+
+        float rayStartX = direction > 0f ? bounds.max.x : bounds.min.x;
+        float rayDistance = travelDistance + attackDashWallSkin;
+        RaycastHit2D nearestHit = default;
+        bool hasHit = false;
+
+        ProbeDashWall(rayStartX, bounds.center.y, direction, rayDistance, wallMask, ref nearestHit, ref hasHit);
+
+        float inset = Mathf.Min(attackDashWallProbeInset, Mathf.Max(0f, bounds.extents.y - 0.01f));
+        ProbeDashWall(rayStartX, bounds.max.y - inset, direction, rayDistance, wallMask, ref nearestHit, ref hasHit);
+
+        float lowerProbeY = Mathf.Lerp(bounds.min.y, bounds.max.y, 0.35f);
+        ProbeDashWall(rayStartX, lowerProbeY, direction, rayDistance, wallMask, ref nearestHit, ref hasHit);
+
+        if (!hasHit)
+            return target;
+
+        float clampedX = nearestHit.point.x - direction * (frontOffset + attackDashWallSkin);
+        clampedX = direction > 0f
+            ? Mathf.Clamp(clampedX, start.x, target.x)
+            : Mathf.Clamp(clampedX, target.x, start.x);
+
+        target.x = clampedX;
+        return target;
+    }
+
+    private void ProbeDashWall(
+        float rayStartX,
+        float rayStartY,
+        float direction,
+        float rayDistance,
+        int wallMask,
+        ref RaycastHit2D nearestHit,
+        ref bool hasHit)
+    {
+        Vector2 rayDirection = direction > 0f ? Vector2.right : Vector2.left;
+        RaycastHit2D hit = Physics2D.Raycast(new Vector2(rayStartX, rayStartY), rayDirection, rayDistance, wallMask);
+
+        if (!IsAttackDashWallHit(hit, rayDirection))
+            return;
+
+        if (hasHit && hit.distance >= nearestHit.distance)
+            return;
+
+        nearestHit = hit;
+        hasHit = true;
+    }
+
+    private bool IsAttackDashWallHit(RaycastHit2D hit, Vector2 rayDirection)
+    {
+        if (hit.collider == null || hit.collider.isTrigger)
+            return false;
+
+        if (hit.collider == bodyCollider || hit.collider.transform.IsChildOf(transform))
+            return false;
+
+        if (hit.normal.sqrMagnitude <= 0.0001f)
+            return false;
+
+        return Vector2.Dot(hit.normal, -rayDirection) >= 0.5f;
     }
 
     private void StopAttackDash()

@@ -196,6 +196,7 @@ GameObject:
   - component: {fileID: 1236087657597769615}
   - component: {fileID: 2022123597033243410}
   - component: {fileID: 1093986075069649039}
+  - component: {fileID: 811900001000000003}
   m_Layer: 11
   m_Name: Root
   m_TagString: Untagged
@@ -344,6 +345,29 @@ MonoBehaviour:
   - {fileID: 7269453505149620671}
   deathSound: {fileID: 8300000, guid: 9265ed225e384fd4bbc8150cde436b23, type: 3}
   hurtSound: {fileID: 8300000, guid: 69ccb40b84c285c4ba9f3c2695435638, type: 3}
+--- !u!114 &811900001000000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7533698243207012030}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 51b413e8ff7c4f6daf0a30fe790d65e9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  health: {fileID: 1597812789670251927}
+  essencePickupPrefab: {fileID: 513927829, guid: 7cbb5dcf21d84b9397929f4ecee51f08, type: 3}
+  spawnPoint: {fileID: 0}
+  minDrops: 2
+  maxDrops: 10
+  essencePerPickup: 1
+  dropOnlyOnce: 1
+  spawnOffset: {x: 0, y: 0.35}
+  horizontalScatterSpeed: 2.8
+  upwardScatterSpeed: 4.2
+  randomScatterVariance: 0.8
 --- !u!114 &1236087657597769615
 MonoBehaviour:
   m_ObjectHideFlags: 0

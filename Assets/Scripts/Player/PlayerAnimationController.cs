@@ -9,6 +9,7 @@ public class PlayerAnimationController : MonoBehaviour
     [SerializeField] private Rigidbody2D rb;
     [SerializeField] private PlayerMovement movement;
     [SerializeField] private PlayerMeleeAttack meleeAttack;
+    [SerializeField] private PlayerSpecialMove specialMove;
     [SerializeField] private Health health;
 
     [Header("Locomotion States")]
@@ -40,6 +41,7 @@ public class PlayerAnimationController : MonoBehaviour
         if (!rb) rb = GetComponentInParent<Rigidbody2D>();
         if (!movement) movement = GetComponentInParent<PlayerMovement>();
         if (!meleeAttack) meleeAttack = GetComponentInParent<PlayerMeleeAttack>();
+        if (!specialMove) specialMove = GetComponentInParent<PlayerSpecialMove>();
         if (!health) health = GetComponentInParent<Health>();
         if (anim) defaultAnimatorSpeed = anim.speed;
         if (visualRoot) defaultVisualScaleX = Mathf.Abs(visualRoot.localScale.x);
@@ -276,7 +278,9 @@ public class PlayerAnimationController : MonoBehaviour
 
     private bool IsLocomotionLocked()
     {
-        return Time.time < locomotionLockedUntil || (meleeAttack != null && meleeAttack.IsAttacking);
+        return Time.time < locomotionLockedUntil
+               || (meleeAttack != null && meleeAttack.IsAttacking)
+               || (specialMove != null && specialMove.IsActive);
     }
 
     private void LockLocomotion(float duration)
@@ -314,7 +318,7 @@ public class PlayerAnimationController : MonoBehaviour
             if (movement.IsDashing && !string.IsNullOrWhiteSpace(dashStateName))
                 return dashStateName;
 
-            if ((movement.IsSliding || movement.ShouldShowWallSlideAnimation) && !string.IsNullOrWhiteSpace(wallSlideStateName))
+            if (movement.IsSliding && !string.IsNullOrWhiteSpace(wallSlideStateName))
                 return wallSlideStateName;
         }
 

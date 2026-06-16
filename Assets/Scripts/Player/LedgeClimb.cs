@@ -15,12 +15,15 @@ public class LedgeClimb : MonoBehaviour
 
     [Header("Detection")]
     [SerializeField] private LayerMask ledgeLayer;
+    [SerializeField] private LayerMask climbBlockLayer;
     [SerializeField] private float lowerRayHeight = -0.35f;
     [SerializeField] private float upperRayHeight = 0.3f;
     [SerializeField] private float rayDistance = 0.6f;
     [SerializeField] private float surfaceProbeTopPadding = 0.25f;
     [SerializeField] private float surfaceProbeBelowWallHit = 0.15f;
     [SerializeField] private float surfaceProbeInset = 0.35f;
+    [SerializeField] private float minimumSurfaceProbeHitDistance = 0.01f;
+    [SerializeField] private float minimumSurfaceHeightAboveWallHit = 0.18f;
 
     [Header("Trap Blocking")]
     [SerializeField] private bool blockClimbOntoTraps = true;
@@ -37,6 +40,7 @@ public class LedgeClimb : MonoBehaviour
     [SerializeField] private Vector2 climbCornerAnchorOffset = new Vector2(0.22f, 0.26f);
     [SerializeField] private float horizontalClearance = 0.08f;
     [SerializeField] private float verticalClearance = 0.02f;
+    [SerializeField] private float landingClearanceSkin = 0.02f;
     [SerializeField] private float maxUpwardSpeedForGrab = 1f;
     [SerializeField] private bool allowWhileSliding = true;
 
@@ -50,17 +54,34 @@ public class LedgeClimb : MonoBehaviour
     private PlayerParry parry;
     private Coroutine climbRoutine;
     private float gravityBeforeClimb;
-    private bool hasLastLedgeDebug;
-    private Vector2 lastLowerRayStart;
-    private Vector2 lastLowerRayEnd;
-    private Vector2 lastUpperRayStart;
-    private Vector2 lastUpperRayEnd;
-    private Vector2 lastSurfaceRayStart;
-    private Vector2 lastSurfaceRayEnd;
-    private Vector2 lastTrapBlockCheckCenter;
-    private Vector2 lastCornerPoint;
+    private LedgeDebugData lastDebug;
 
     public bool IsClimbing { get; private set; }
+
+    private struct LedgeCandidate
+    {
+        public Vector2 LowerRayStart;
+        public Vector2 LowerRayEnd;
+        public Vector2 UpperRayStart;
+        public Vector2 UpperRayEnd;
+        public Vector2 SurfaceProbeStart;
+        public Vector2 SurfaceProbeEnd;
+        public Vector2 WallPoint;
+        public Vector2 SurfacePoint;
+        public Vector2 CornerPoint;
+        public Vector2 TrapCheckCenter;
+        public Vector2 LandingClearanceCenter;
+        public Vector2 LandingClearanceSize;
+        public Vector3 GrabPosition;
+        public Vector3 ClimbPosition;
+        public Vector3 EndPosition;
+    }
+
+    private struct LedgeDebugData
+    {
+        public bool HasValue;
+        public LedgeCandidate Candidate;
+    }
 
     private void Awake()
     {
@@ -174,30 +195,11 @@ public class LedgeClimb : MonoBehaviour
 
     private void TryStartClimb()
     {
-        float dirSign = playerMovement.IsFacingRight ? 1f : -1f;
-        Vector2 direction = playerMovement.IsFacingRight ? Vector2.right : Vector2.left;
-        Vector2 origin = transform.position;
-
-        Vector2 lowerOrigin = origin + Vector2.up * lowerRayHeight;
-        Vector2 upperOrigin = origin + Vector2.up * upperRayHeight;
-
-        RaycastHit2D lowerHit = CastLedgeRay(lowerOrigin, direction, rayDistance);
-        bool upperBlocked = CastLedgeRay(upperOrigin, direction, rayDistance).collider != null;
-
-        if (lowerHit.collider == null || upperBlocked)
+        if (!TryBuildLedgeCandidate(out LedgeCandidate candidate))
             return;
 
-        if (!IsMovingTowardLedge(dirSign))
-            return;
-
-        if (!TryFindSurfacePoint(lowerHit.point, dirSign, out Vector2 surfacePoint))
-            return;
-
-        if (IsTrapBlockingClimb(lowerHit.point, surfacePoint, dirSign))
-            return;
-
-        StoreLedgeDebug(lowerOrigin, upperOrigin, direction, lowerHit.point, surfacePoint);
-        climbRoutine = StartCoroutine(ClimbRoutine(lowerHit.point, surfacePoint, dirSign));
+        StoreLedgeDebug(candidate);
+        climbRoutine = StartCoroutine(ClimbRoutine(candidate));
     }
 
     private bool IsMovingTowardLedge(float dirSign)
@@ -208,12 +210,54 @@ public class LedgeClimb : MonoBehaviour
         return Mathf.Sign(rb.velocity.x) == dirSign;
     }
 
-    private bool TryFindSurfacePoint(Vector2 wallHitPoint, float dirSign, out Vector2 surfacePoint)
+    private bool TryBuildLedgeCandidate(out LedgeCandidate candidate)
     {
-        GetSurfaceProbeLine(wallHitPoint, dirSign, out Vector2 probeStart, out Vector2 probeEnd);
+        candidate = default;
+
+        float dirSign = playerMovement.IsFacingRight ? 1f : -1f;
+        Vector2 direction = playerMovement.IsFacingRight ? Vector2.right : Vector2.left;
+        Vector2 lowerOrigin = (Vector2)transform.position + Vector2.up * lowerRayHeight;
+        Vector2 upperOrigin = (Vector2)transform.position + Vector2.up * upperRayHeight;
+
+        if (!TryFindWallHit(lowerOrigin, upperOrigin, direction, out RaycastHit2D wallHit))
+            return false;
+
+        if (!IsMovingTowardLedge(dirSign))
+            return false;
+
+        if (!TryFindSurfacePoint(wallHit.point, dirSign, out Vector2 surfacePoint, out Vector2 probeStart, out Vector2 probeEnd))
+            return false;
+
+        candidate = CreateLedgeCandidate(dirSign, direction, lowerOrigin, upperOrigin, wallHit.point, surfacePoint, probeStart, probeEnd);
+
+        if (IsTrapBlockingClimb(candidate))
+            return false;
+
+        return HasClimbEndClearance(ref candidate);
+    }
+
+    private bool TryFindWallHit(Vector2 lowerOrigin, Vector2 upperOrigin, Vector2 direction, out RaycastHit2D wallHit)
+    {
+        wallHit = CastLedgeRay(lowerOrigin, direction, rayDistance);
+        if (wallHit.collider == null)
+            return false;
+
+        return CastLedgeRay(upperOrigin, direction, rayDistance).collider == null;
+    }
+
+    private bool TryFindSurfacePoint(
+        Vector2 wallHitPoint,
+        float dirSign,
+        out Vector2 surfacePoint,
+        out Vector2 probeStart,
+        out Vector2 probeEnd)
+    {
+        GetSurfaceProbeLine(wallHitPoint, dirSign, out probeStart, out probeEnd);
 
         RaycastHit2D surfaceHit = CastSurfaceProbe(probeStart, probeEnd);
-        if (surfaceHit.collider == null || surfaceHit.normal.y < 0.5f)
+        if (surfaceHit.collider == null
+            || surfaceHit.normal.y < 0.5f
+            || !IsSurfaceHighEnoughForLedge(wallHitPoint, surfaceHit.point))
         {
             surfacePoint = default;
             return false;
@@ -223,16 +267,43 @@ public class LedgeClimb : MonoBehaviour
         return true;
     }
 
-    private void StoreLedgeDebug(Vector2 lowerOrigin, Vector2 upperOrigin, Vector2 direction, Vector2 wallHitPoint, Vector2 surfacePoint)
+    private LedgeCandidate CreateLedgeCandidate(
+        float dirSign,
+        Vector2 direction,
+        Vector2 lowerOrigin,
+        Vector2 upperOrigin,
+        Vector2 wallPoint,
+        Vector2 surfacePoint,
+        Vector2 surfaceProbeStart,
+        Vector2 surfaceProbeEnd)
     {
-        hasLastLedgeDebug = true;
-        lastLowerRayStart = lowerOrigin;
-        lastLowerRayEnd = lowerOrigin + direction * rayDistance;
-        lastUpperRayStart = upperOrigin;
-        lastUpperRayEnd = upperOrigin + direction * rayDistance;
+        Vector2 cornerPoint = new Vector2(wallPoint.x, surfacePoint.y);
 
-        GetSurfaceProbeLine(wallHitPoint, Mathf.Sign(direction.x), out lastSurfaceRayStart, out lastSurfaceRayEnd);
-        lastCornerPoint = new Vector2(wallHitPoint.x, surfacePoint.y);
+        return new LedgeCandidate
+        {
+            LowerRayStart = lowerOrigin,
+            LowerRayEnd = lowerOrigin + direction * rayDistance,
+            UpperRayStart = upperOrigin,
+            UpperRayEnd = upperOrigin + direction * rayDistance,
+            SurfaceProbeStart = surfaceProbeStart,
+            SurfaceProbeEnd = surfaceProbeEnd,
+            WallPoint = wallPoint,
+            SurfacePoint = surfacePoint,
+            CornerPoint = cornerPoint,
+            TrapCheckCenter = GetTrapCheckCenter(cornerPoint, dirSign),
+            GrabPosition = GetCornerAnchoredPosition(cornerPoint, dirSign, grabCornerAnchorOffset),
+            ClimbPosition = GetCornerAnchoredPosition(cornerPoint, dirSign, climbCornerAnchorOffset),
+            EndPosition = GetClimbEndPosition(wallPoint, surfacePoint, dirSign)
+        };
+    }
+
+    private void StoreLedgeDebug(LedgeCandidate candidate)
+    {
+        lastDebug = new LedgeDebugData
+        {
+            HasValue = true,
+            Candidate = candidate
+        };
     }
 
     private void GetSurfaceProbeLine(Vector2 wallHitPoint, float dirSign, out Vector2 probeStart, out Vector2 probeEnd)
@@ -251,10 +322,10 @@ public class LedgeClimb : MonoBehaviour
 
     private RaycastHit2D CastSurfaceProbe(Vector2 probeStart, Vector2 probeEnd)
     {
-        return CastLedgeRay(probeStart, Vector2.down, Vector2.Distance(probeStart, probeEnd));
+        return CastLedgeRay(probeStart, Vector2.down, Vector2.Distance(probeStart, probeEnd), true);
     }
 
-    private RaycastHit2D CastLedgeRay(Vector2 origin, Vector2 direction, float distance)
+    private RaycastHit2D CastLedgeRay(Vector2 origin, Vector2 direction, float distance, bool ignoreInitialOverlapHits = false)
     {
         RaycastHit2D[] hits = Physics2D.RaycastAll(origin, direction, distance, ledgeLayer);
         RaycastHit2D closestHit = default;
@@ -264,6 +335,9 @@ public class LedgeClimb : MonoBehaviour
         {
             RaycastHit2D hit = hits[i];
             if (hit.collider == null || !IsValidLedgeCollider(hit.collider))
+                continue;
+
+            if (ignoreInitialOverlapHits && IsInitialOverlapHit(hit))
                 continue;
 
             if (hit.distance < closestDistance)
@@ -276,16 +350,23 @@ public class LedgeClimb : MonoBehaviour
         return closestHit;
     }
 
-    private bool IsTrapBlockingClimb(Vector2 wallHitPoint, Vector2 surfacePoint, float dirSign)
+    private bool IsInitialOverlapHit(RaycastHit2D hit)
+    {
+        float minDistance = Mathf.Max(0f, minimumSurfaceProbeHitDistance);
+        return hit.distance <= minDistance || hit.fraction <= 0.0001f;
+    }
+
+    private bool IsSurfaceHighEnoughForLedge(Vector2 wallHitPoint, Vector2 surfacePoint)
+    {
+        return surfacePoint.y >= wallHitPoint.y + Mathf.Max(0f, minimumSurfaceHeightAboveWallHit);
+    }
+
+    private bool IsTrapBlockingClimb(LedgeCandidate candidate)
     {
         if (!blockClimbOntoTraps)
             return false;
 
-        Vector2 cornerPoint = new Vector2(wallHitPoint.x, surfacePoint.y);
-        Vector2 checkCenter = cornerPoint + new Vector2(trapBlockCheckOffset.x * dirSign, trapBlockCheckOffset.y);
-        lastTrapBlockCheckCenter = checkCenter;
-
-        Collider2D[] hits = Physics2D.OverlapBoxAll(checkCenter, trapBlockCheckSize, 0f);
+        Collider2D[] hits = Physics2D.OverlapBoxAll(candidate.TrapCheckCenter, trapBlockCheckSize, 0f);
         for (int i = 0; i < hits.Length; i++)
         {
             Collider2D hit = hits[i];
@@ -297,6 +378,51 @@ public class LedgeClimb : MonoBehaviour
         }
 
         return false;
+    }
+
+    private Vector2 GetTrapCheckCenter(Vector2 cornerPoint, float dirSign)
+    {
+        return cornerPoint + new Vector2(trapBlockCheckOffset.x * dirSign, trapBlockCheckOffset.y);
+    }
+
+    private bool HasClimbEndClearance(ref LedgeCandidate candidate)
+    {
+        if (bodyCollider == null)
+            return true;
+
+        Bounds bounds = bodyCollider.bounds;
+        Vector2 centerOffset = bounds.center - transform.position;
+        candidate.LandingClearanceCenter = (Vector2)candidate.EndPosition + centerOffset;
+        candidate.LandingClearanceSize = GetLandingClearanceCheckSize(bounds);
+
+        Collider2D[] hits = Physics2D.OverlapBoxAll(
+            candidate.LandingClearanceCenter,
+            candidate.LandingClearanceSize,
+            0f,
+            GetClimbBlockLayer());
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider2D hit = hits[i];
+            if (hit == null || !IsValidLedgeCollider(hit))
+                continue;
+
+            return false;
+        }
+
+        return true;
+    }
+
+    private Vector2 GetLandingClearanceCheckSize(Bounds bounds)
+    {
+        float skin = Mathf.Max(0f, landingClearanceSkin);
+        return new Vector2(
+            Mathf.Max(0.01f, bounds.size.x - skin * 2f),
+            Mathf.Max(0.01f, bounds.size.y - skin * 2f));
+    }
+
+    private LayerMask GetClimbBlockLayer()
+    {
+        return climbBlockLayer.value != 0 ? climbBlockLayer : ledgeLayer;
     }
 
     private bool IsValidLedgeCollider(Collider2D hit)
@@ -322,7 +448,7 @@ public class LedgeClimb : MonoBehaviour
         return currentBodyCollider != null ? currentBodyCollider.bounds : new Bounds(transform.position, Vector3.one);
     }
 
-    private IEnumerator ClimbRoutine(Vector2 wallHitPoint, Vector2 surfacePoint, float dirSign)
+    private IEnumerator ClimbRoutine(LedgeCandidate candidate)
     {
         IsClimbing = true;
         gravityBeforeClimb = rb.gravityScale;
@@ -334,21 +460,18 @@ public class LedgeClimb : MonoBehaviour
         rb.velocity = Vector2.zero;
         animationController?.SetAnimatorSpeed(climbAnimationSpeed);
 
-        Vector3 grabPosition = GetCornerAnchoredPosition(wallHitPoint, surfacePoint, dirSign, grabCornerAnchorOffset);
-        MoveBodyTo(grabPosition);
+        MoveBodyTo(candidate.GrabPosition);
 
         PlayLockedState(grabStateName, grabDuration);
-        yield return HoldPositionForSeconds(grabPosition, grabDuration);
+        yield return HoldPositionForSeconds(candidate.GrabPosition, grabDuration);
 
-        Vector3 climbPosition = GetCornerAnchoredPosition(wallHitPoint, surfacePoint, dirSign, climbCornerAnchorOffset);
-        MoveBodyTo(climbPosition);
+        MoveBodyTo(candidate.ClimbPosition);
 
         PlayLockedState(climbStateName, climbDuration);
-        yield return HoldPositionForSeconds(climbPosition, climbDuration);
+        yield return HoldPositionForSeconds(candidate.ClimbPosition, climbDuration);
 
         ResetVisualOffset();
-        Vector3 endPosition = GetClimbEndPosition(wallHitPoint, surfacePoint, dirSign);
-        MoveBodyTo(endPosition);
+        MoveBodyTo(candidate.EndPosition);
 
         rb.velocity = Vector2.zero;
 
@@ -375,9 +498,8 @@ public class LedgeClimb : MonoBehaviour
         }
     }
 
-    private Vector3 GetCornerAnchoredPosition(Vector2 wallHitPoint, Vector2 surfacePoint, float dirSign, Vector2 anchorOffset)
+    private Vector3 GetCornerAnchoredPosition(Vector2 cornerPoint, float dirSign, Vector2 anchorOffset)
     {
-        Vector2 cornerPoint = new Vector2(wallHitPoint.x, surfacePoint.y);
         Vector2 facingAwareAnchor = new Vector2(anchorOffset.x * dirSign, anchorOffset.y);
 
         return new Vector3(
@@ -441,9 +563,9 @@ public class LedgeClimb : MonoBehaviour
         Vector3 direction = dirSign > 0f ? Vector3.right : Vector3.left;
         Vector3 origin = transform.position;
 
-        if (IsClimbing && hasLastLedgeDebug)
+        if (IsClimbing && lastDebug.HasValue)
         {
-            DrawStoredLedgeDebug();
+            DrawLedgeCandidateDebug(lastDebug.Candidate);
         }
         else
         {
@@ -466,8 +588,8 @@ public class LedgeClimb : MonoBehaviour
         Vector2 lowerOrigin = origin + Vector2.up * lowerRayHeight;
         Vector2 upperOrigin = origin + Vector2.up * upperRayHeight;
 
-        RaycastHit2D lowerHit = Physics2D.Raycast(lowerOrigin, direction, rayDistance, ledgeLayer);
-        RaycastHit2D upperHit = Physics2D.Raycast(upperOrigin, direction, rayDistance, ledgeLayer);
+        RaycastHit2D lowerHit = CastLedgeRay(lowerOrigin, direction, rayDistance);
+        RaycastHit2D upperHit = CastLedgeRay(upperOrigin, direction, rayDistance);
 
         Gizmos.color = Color.red;
         Gizmos.DrawLine(lowerOrigin, lowerOrigin + direction * rayDistance);
@@ -485,41 +607,60 @@ public class LedgeClimb : MonoBehaviour
         if (Application.isPlaying && (!CanAttemptClimb() || !IsMovingTowardLedge(dirSign)))
             return;
 
-        GetSurfaceProbeLine(lowerHit.point, dirSign, out Vector2 probeStart, out Vector2 probeEnd);
-        RaycastHit2D surfaceHit = CastSurfaceProbe(probeStart, probeEnd);
+        bool hasSurface = TryFindSurfacePoint(
+            lowerHit.point,
+            dirSign,
+            out Vector2 surfacePoint,
+            out Vector2 probeStart,
+            out Vector2 probeEnd);
 
         Gizmos.color = Color.cyan;
         Gizmos.DrawLine(probeStart, probeEnd);
 
-        if (surfaceHit.collider == null || surfaceHit.normal.y < 0.5f)
+        if (!hasSurface)
             return;
 
-        Vector2 cornerPoint = new Vector2(lowerHit.point.x, surfaceHit.point.y);
-        Gizmos.color = Color.white;
-        Gizmos.DrawWireSphere(cornerPoint, 0.055f);
+        LedgeCandidate candidate = CreateLedgeCandidate(
+            dirSign,
+            direction,
+            lowerOrigin,
+            upperOrigin,
+            lowerHit.point,
+            surfacePoint,
+            probeStart,
+            probeEnd);
 
-        Gizmos.color = new Color(1f, 0.25f, 0.25f, 0.8f);
-        Gizmos.DrawWireCube(
-            cornerPoint + new Vector2(trapBlockCheckOffset.x * dirSign, trapBlockCheckOffset.y),
-            trapBlockCheckSize);
+        HasClimbEndClearance(ref candidate);
+        DrawLedgeCandidateExtras(candidate);
     }
 
-    private void DrawStoredLedgeDebug()
+    private void DrawLedgeCandidateDebug(LedgeCandidate candidate)
     {
         Gizmos.color = Color.red;
-        Gizmos.DrawLine(lastLowerRayStart, lastLowerRayEnd);
+        Gizmos.DrawLine(candidate.LowerRayStart, candidate.LowerRayEnd);
 
         Gizmos.color = Color.yellow;
-        Gizmos.DrawLine(lastUpperRayStart, lastUpperRayEnd);
+        Gizmos.DrawLine(candidate.UpperRayStart, candidate.UpperRayEnd);
 
         Gizmos.color = Color.cyan;
-        Gizmos.DrawLine(lastSurfaceRayStart, lastSurfaceRayEnd);
+        Gizmos.DrawLine(candidate.SurfaceProbeStart, candidate.SurfaceProbeEnd);
 
+        DrawLedgeCandidateExtras(candidate);
+    }
+
+    private void DrawLedgeCandidateExtras(LedgeCandidate candidate)
+    {
         Gizmos.color = Color.white;
-        Gizmos.DrawWireSphere(lastCornerPoint, 0.055f);
+        Gizmos.DrawWireSphere(candidate.CornerPoint, 0.055f);
 
         Gizmos.color = new Color(1f, 0.25f, 0.25f, 0.8f);
-        Gizmos.DrawWireCube(lastTrapBlockCheckCenter, trapBlockCheckSize);
+        Gizmos.DrawWireCube(candidate.TrapCheckCenter, trapBlockCheckSize);
+
+        if (candidate.LandingClearanceSize != Vector2.zero)
+        {
+            Gizmos.color = new Color(0.2f, 0.8f, 1f, 0.8f);
+            Gizmos.DrawWireCube(candidate.LandingClearanceCenter, candidate.LandingClearanceSize);
+        }
     }
 
     private float GetDebugFacingSign()
