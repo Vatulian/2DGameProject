@@ -214,6 +214,9 @@ public class KamikazeEnemy : MonoBehaviour
 
     private void UpdateDiveDirection()
     {
+        if (player == null)
+            return;
+
         float horizontalDirection = Mathf.Sign(player.position.x - transform.position.x);
         if (Mathf.Approximately(horizontalDirection, 0f))
             horizontalDirection = GetForwardDirection().x;
@@ -296,11 +299,14 @@ public class KamikazeEnemy : MonoBehaviour
 
     private bool CanAcquireDiveTarget()
     {
-        return IsPlayerInDiveRange() && HasClearLineOfSight();
+        return HasValidPlayerTarget() && IsPlayerInDiveRange() && HasClearLineOfSight();
     }
 
     private bool IsPlayerInDiveRange()
     {
+        if (!HasValidPlayerTarget())
+            return false;
+
         Vector2 offset = (Vector2)player.position - (Vector2)visionOrigin.position;
         float horizontalDistance = Mathf.Abs(offset.x);
         float verticalDrop = -offset.y;
@@ -314,6 +320,14 @@ public class KamikazeEnemy : MonoBehaviour
         }
 
         return Mathf.Abs(horizontalDistance - verticalDrop) <= diveLineTolerance;
+    }
+
+    private bool HasValidPlayerTarget()
+    {
+        return player != null
+               && playerHealth != null
+               && !playerHealth.IsDead
+               && visionOrigin != null;
     }
 
     private Vector2 GetForwardDirection()

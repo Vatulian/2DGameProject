@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   displayName: MANA REGEN
   description: Restore more mana each tick.
-  icon: {fileID: 0}
+  icon: {fileID: 4121880872312635667, guid: ffc9f271fad56c243a45f100b9dc6778, type: 3}
   basePrice: 10
   priceIncreasePerPurchase: 0
   maximumPurchases: 1

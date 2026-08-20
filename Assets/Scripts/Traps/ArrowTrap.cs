@@ -14,9 +14,23 @@ public class ArrowTrap : MonoBehaviour
     {
         cooldownTimer = 0;
 
-        SoundManager.instance.PlaySound(arrowSound);
-        arrows[FindArrow()].transform.position = firePoint.position;
-        arrows[FindArrow()].GetComponent<EnemyProjectile>().ActivateProjectile();
+        if (firePoint == null || arrows == null || arrows.Length == 0)
+            return;
+
+        int arrowIndex = FindArrow();
+        GameObject arrow = arrows[arrowIndex];
+        if (arrow == null)
+            return;
+
+        EnemyProjectile projectile = arrow.GetComponent<EnemyProjectile>();
+        if (projectile == null)
+            return;
+
+        if (arrowSound != null && SoundManager.instance != null)
+            SoundManager.instance.PlaySound(arrowSound);
+
+        arrow.transform.position = firePoint.position;
+        projectile.ActivateProjectile();
     }
     private int FindArrow()
     {

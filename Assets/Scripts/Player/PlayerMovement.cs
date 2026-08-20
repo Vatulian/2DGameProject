@@ -248,7 +248,7 @@ public class PlayerMovement : MonoBehaviour
         #endregion
 
         #region WALL CLING TRACKING
-        bool onWallNow = LastOnWallTime > 0 && LastOnGroundTime <= 0;
+        bool onWallNow = HasCurrentWallContact() && LastOnGroundTime <= 0;
 
         if (onWallNow && !_wasOnWall)
         {
@@ -828,8 +828,9 @@ public class PlayerMovement : MonoBehaviour
 
     public bool CanSlide()
     {
-        return GetWallSlideWallDirection() != 0
-            && ((HasCurrentWallContact() && IsPressingIntoWall()) || CanUseWallSlideGrace())
+        return HasCurrentWallContact()
+            && GetWallSlideWallDirection() != 0
+            && (IsPressingIntoWall() || CanUseWallSlideGrace())
             && !IsJumping
             && !IsWallJumping
             && !IsDashing
@@ -868,10 +869,10 @@ public class PlayerMovement : MonoBehaviour
 
     private int GetCurrentWallDirection()
     {
-        if (_isTouchingWallRight || LastOnWallRightTime > 0)
+        if (_isTouchingWallRight)
             return 1;
 
-        if (_isTouchingWallLeft || LastOnWallLeftTime > 0)
+        if (_isTouchingWallLeft)
             return -1;
 
         return 0;

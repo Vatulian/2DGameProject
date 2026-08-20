@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   displayName: MANA EFFICIENCY
   description: Reduce all skill mana costs.
-  icon: {fileID: 0}
+  icon: {fileID: -4570538037665054336, guid: 3d6be91968cb95546ac95aeff5e52f84, type: 3}
   basePrice: 10
   priceIncreasePerPurchase: 0
   maximumPurchases: 1

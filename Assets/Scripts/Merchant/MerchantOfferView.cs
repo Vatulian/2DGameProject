@@ -7,6 +7,7 @@ using UnityEngine.UI;
 public class MerchantOfferView : MonoBehaviour, IPointerEnterHandler, IPointerClickHandler
 {
     [SerializeField] private Image backgroundImage;
+    [SerializeField] private Image iconImage;
     [SerializeField] private TMP_Text priceText;
     [SerializeField] private TMP_Text purchaseCountText;
     [SerializeField] private Button buyButton;
@@ -48,6 +49,12 @@ public class MerchantOfferView : MonoBehaviour, IPointerEnterHandler, IPointerCl
         buyAction = onBuy;
         selectAction = onSelect;
         bool soldOut = purchaseCount >= offer.MaximumPurchases;
+
+        if (iconImage != null)
+        {
+            iconImage.sprite = offer.Icon;
+            iconImage.enabled = offer.Icon != null;
+        }
 
         if (priceText != null)
             priceText.text = soldOut ? soldOutText : string.Format(priceFormat, price);
